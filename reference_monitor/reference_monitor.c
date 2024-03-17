@@ -36,21 +36,20 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
 //apertura file nello space kernerl --> syscall do_filp_open
 static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
     
-    int fd = (int) regs->di;
+    //int fd = (int) regs->di;
     const char *filename = ((struct filename *)(regs->si))->name;
-    //struct open_flags *op_flags = (struct open_flags *)(regs->dx);
-    //int flags = op_flags->open_flag;
-    //unsigned short  mode = op_flags->mode;
+    int flags = (int) regs->dx;
+    //umode_t mode = (umode_t) regs->r10;
 
     //evito file in /run perché non interessano ed intasano il log di dmesg
-    /*if(strcmp(filename, "/run") == 0) {
-        return 0;
-    }*/
     if(strncmp_custom(filename, "/run", 4) == 0) {
         return 0;
     }
 
-    //printk(KERN_INFO "Reference Monitor: open_kernel_prehandler: filename: %s, flags: %d, mode: %d\n", filename, flags, mode);
+    if(!(flags & O_CREAT) || !(flags & O_WRONLY) || !(flags & O_RDWR) || !(flags(O_EXCL))) {
+        return 0;
+    }
+    
     printk(KERN_INFO "Reference Monitor: open_kernel_prehandler: filename: %s\n", filename);
 
 
