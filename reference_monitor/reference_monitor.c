@@ -1,17 +1,26 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/kprobes.h>
-#include <linux/limits.h>
 #include <linux/fs.h>
-#include <linux/fdtable.h>
-#include <linux/sched.h>
-#include <linux/fcntl.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <linux/cred.h>
+#include <linux/cdev.h>
 #include <linux/errno.h>
+#include <linux/device.h>
+#include <linux/kprobes.h>
+#include <linux/mutex.h>
+#include <linux/mm.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/fdtable.h>
+#include <linux/version.h>
+#include <linux/interrupt.h>
+#include <linux/time.h>
+#include <linux/string.h>
+#include <linux/vmalloc.h>
+#include <linux/syscalls.h>
+#include <linux/namei.h>
+#include <linux/random.h>
+#include <linux/scatterlist.h>
+#include <linux/fs_struct.h>
+#include <linux/mm_types.h>
+
 
 #define MODNAME "reference_monitor"
 MODULE_LICENSE("GPL");
