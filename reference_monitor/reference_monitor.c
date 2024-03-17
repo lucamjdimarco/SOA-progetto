@@ -21,6 +21,7 @@ MODULE_DESCRIPTION("Implementazione di un Reference Monitor");
 int strncmp_custom(const char *s1, const char *s2, size_t n) {
     size_t i;
     for (i = 0; i < n; i++) {
+        
         if (s1[i] != s2[i]) {
             return s1[i] - s2[i];
         }
