@@ -58,18 +58,27 @@ static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
 }
 
 //apertura file di alto livello --> syscall sys_openat2
-static int openat2_prehandler(struct kprobe *p, struct pt_regs *regs)
+static int openat_prehandler(struct kprobe *p, struct pt_regs *regs)
 {
     int dfd = regs->di;
-    struct open_how *how = (struct open_how *)regs->si;
-    struct filename *filename = (struct filename *)regs->dx;
+    const char __user *filename = (const char __user *)regs->si;
+    int flags = regs->dx;
+    umode_t mode = (umode_t) regs->r10;
 
-    if(strncmp_custom(filename->name, "/run", 4) == 0) {
-        return 0;
-    }
+    char path[PATH_MAX];
+    long copied = strncpy_from_user(path, filename, PATH_MAX);
 
-    if (how->flags & O_CREAT || how->flags & O_WRONLY || how->flags & O_RDWR) {
-        printk(KERN_INFO "File %s è stato creato o aperto in scrittura\n", filename->name);
+    /* Ensure path is null-terminated in case of PATH_MAX length paths */
+    path[PATH_MAX - 1] = '\0';
+
+    if (copied > 0 || copied == -EFAULT) {
+        if(strncmp_custom(path, "/run", 4) == 0) {
+            return 0;
+        }
+
+        if (flags & O_CREAT || flags & O_WRONLY || flags & O_RDWR) {
+            printk(KERN_INFO "File %s è stato creato o aperto in scrittura\n", path);
+        }
     }
 
     return 0;
@@ -80,9 +89,9 @@ static struct kprobe kp_do_filp_open = {
     .symbol_name = "do_filp_open",
 };
 
-static struct kprobe kp_do_sys_openat2 = {
-    .pre_handler = openat2_prehandler,
-    .symbol_name = "do_sys_openat2",
+static struct kprobe kp_do_sys_openat = {
+    .pre_handler = openat_prehandler,
+    .symbol_name = "do_sys_openat",
 };
 
 int init_module(void) {
@@ -95,12 +104,12 @@ int init_module(void) {
     }
     printk(KERN_INFO "%s: Kprobe do_filp_open registered successfully\n", MODNAME);
     
-    ret = register_kprobe(&kp_do_sys_openat2);
+    ret = register_kprobe(&kp_do_sys_openat);
     if (ret < 0) {
-        printk(KERN_ERR "%s: Failed to register do_sys_openat2 kprobe, error %d\n", MODNAME, ret);
+        printk(KERN_ERR "%s: Failed to register do_sys_openat kprobe, error %d\n", MODNAME, ret);
         return ret;
     }
-    printk(KERN_INFO "%s: Kprobe do_sys_openat2 registered successfully\n", MODNAME);
+    printk(KERN_INFO "%s: Kprobe do_sys_openat registered successfully\n", MODNAME);
     return 0;
 }
 
@@ -108,6 +117,6 @@ void cleanup_module(void) {
     unregister_kprobe(&kp_do_filp_open);
     printk(KERN_INFO "%s: Kprobe do_filp_open unregistered\n", MODNAME);
     unregister_kprobe(&kp_do_sys_openat2);
-    printk(KERN_INFO "%s: Kprobe do_sys_openat2 unregistered\n", MODNAME);
+    printk(KERN_INFO "%s: Kprobe do_sys_openat unregistered\n", MODNAME);
 }
 
