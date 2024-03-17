@@ -23,9 +23,9 @@ static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
     
     int fd = (int) regs->di;
     const char *filename = ((struct filename *)(regs->si))->name;
-    struct open_flags *op_flags = (struct open_flags *) regs->dx;
+    struct open_flags *op_flags = (struct open_flags *)(regs->dx);
     int flags = op_flags->open_flag;
-    int mode = op_flags->mode;
+    unsigned short mode = op_flags->mode;
 
     //evito file in /run perché non interessano ed intasano il log di dmesg
     if(strcmp(filename, "/run") == 0) {
@@ -34,7 +34,7 @@ static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
 
     printk(KERN_INFO "Reference Monitor: open_kernel_prehandler: filename: %s, flags: %d, mode: %d\n", filename, flags, mode);
 
-
+    return 0;
 }
 
 static struct kprobe kp = {
