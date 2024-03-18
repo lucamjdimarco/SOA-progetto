@@ -18,6 +18,13 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Luca Di Marco");
 MODULE_DESCRIPTION("Implementazione di un Reference Monitor");
 
+struct my_open_how {
+    __aligned_u64 flags;
+    __u16 mode;
+    __u16 __padding[3]; /* must be zeroed */
+    __aligned_u64 resolve;
+};
+
 int strncmp_custom(const char *s1, const char *s2, size_t n) {
     size_t i;
     for (i = 0; i < n; i++) {
@@ -60,30 +67,18 @@ static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
 //apertura file di alto livello --> syscall sys_openat2
 static int open_prehandler(struct kprobe *p, struct pt_regs *regs)
 {
-    //int dfd = regs->di;
-    //const char *file_path = ((struct filename *)(regs->si))->name;
-    const char *file_path = (const char __user *) regs->di;
-    int flags = regs->si;
-    //umode_t mode = (umode_t) regs->r10;
+    int dfd = regs->di;
+    struct filename *filename = (struct filename *)regs->si;
+    struct open_how *how = (struct open_how *)regs->dx;
 
-    
-    //char path[PATH_MAX];
-    //long copied = strncpy_from_user(path, user_path, PATH_MAX);
-
-    /* Ensure path is null-terminated in case of PATH_MAX length paths */
-    /*path[PATH_MAX - 1] = '\0';
-
-    if (copied > 0 || copied == -EFAULT) {
-        if(strncmp_custom(path, "/run", 4) == 0) {
-            return 0;
-        }
-
-        if (flags & O_CREAT || flags & O_WRONLY || flags & O_RDWR) {
-            printk(KERN_INFO "File %s è stato creato o aperto in scrittura\n", path);
-        }
+    if (copy_from_user(&how, (struct my_open_how __user *)regs->dx, sizeof(how))) {
+        return -EFAULT;
     }
 
-    return 0;*/
+    const char *file_path = filename->name;
+    int flags = how.flags;
+    
+
 
     if(strncmp(file_path, "/run", 4) == 0) {
         return 0;
@@ -103,7 +98,7 @@ static struct kprobe kp_do_filp_open = {
 
 static struct kprobe kp_do_sys_open = {
     .pre_handler = open_prehandler,
-    .symbol_name = "do_sys_open",
+    .symbol_name = "do_sys_openat2",
 };
 
 int init_module(void) {
