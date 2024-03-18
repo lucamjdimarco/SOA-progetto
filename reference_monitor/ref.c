@@ -71,16 +71,8 @@ static int open_prehandler(struct kprobe *p, struct pt_regs *regs)
     struct filename *filename = (struct filename *)regs->si;
     struct open_how *how = (struct open_how *)regs->dx;
 
-    if (copy_from_user(&how, (struct my_open_how __user *)regs->dx, sizeof(how))) {
-        return -EFAULT;
-    }
-
-    const char *file_path = getname(filename);
-    int flags = how.flags;
-
-    if (IS_ERR(file_path)) {
-        return PTR_ERR(file_path);
-    }
+    const char *file_path = filename->name;
+    int flags = how->flags;
     
     if(strncmp(file_path, "/run", 4) == 0) {
         return 0;
