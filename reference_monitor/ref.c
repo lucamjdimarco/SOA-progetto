@@ -75,11 +75,13 @@ static int open_prehandler(struct kprobe *p, struct pt_regs *regs)
         return -EFAULT;
     }
 
-    const char *file_path = filename->name;
+    const char *file_path = getname(filename);
     int flags = how.flags;
+
+    if (IS_ERR(file_path)) {
+        return PTR_ERR(file_path);
+    }
     
-
-
     if(strncmp(file_path, "/run", 4) == 0) {
         return 0;
     }
