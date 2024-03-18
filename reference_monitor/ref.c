@@ -61,15 +61,17 @@ static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
 static int openat_prehandler(struct kprobe *p, struct pt_regs *regs)
 {
     int dfd = regs->di;
-    const char __user *filename = (const char __user *)regs->si;
+    struct filename *filename = (struct filename *)regs->si;
+    const char *kernel_path = filename->name;
     int flags = regs->dx;
     umode_t mode = (umode_t) regs->r10;
 
-    char path[PATH_MAX];
-    long copied = strncpy_from_user(path, filename, PATH_MAX);
+    
+    //char path[PATH_MAX];
+    //long copied = strncpy_from_user(path, user_path, PATH_MAX);
 
     /* Ensure path is null-terminated in case of PATH_MAX length paths */
-    path[PATH_MAX - 1] = '\0';
+    /*path[PATH_MAX - 1] = '\0';
 
     if (copied > 0 || copied == -EFAULT) {
         if(strncmp_custom(path, "/run", 4) == 0) {
@@ -79,6 +81,16 @@ static int openat_prehandler(struct kprobe *p, struct pt_regs *regs)
         if (flags & O_CREAT || flags & O_WRONLY || flags & O_RDWR) {
             printk(KERN_INFO "File %s è stato creato o aperto in scrittura\n", path);
         }
+    }
+
+    return 0;*/
+
+    if(strncmp(kernel_path, "/run", 4) == 0) {
+        return 0;
+    }
+
+    if (flags & O_CREAT || flags & O_WRONLY || flags & O_RDWR) {
+        printk(KERN_INFO "Reference Monitor: openat_prehandler: File %s è stato creato o aperto in scrittura\n", kernel_path);
     }
 
     return 0;
