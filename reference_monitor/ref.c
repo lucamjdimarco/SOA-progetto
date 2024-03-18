@@ -102,7 +102,7 @@ static struct kprobe kp_do_filp_open = {
 };
 
 static struct kprobe kp_do_sys_open = {
-    .pre_handler = openat_prehandler,
+    .pre_handler = open_prehandler,
     .symbol_name = "do_sys_open",
 };
 
@@ -116,7 +116,7 @@ int init_module(void) {
     }
     printk(KERN_INFO "%s: Kprobe do_filp_open registered successfully\n", MODNAME);
     
-    ret = register_kprobe(&kp_do_sys_openat);
+    ret = register_kprobe(&kp_do_sys_open);
     if (ret < 0) {
         printk(KERN_ERR "%s: Failed to register do_sys_open kprobe, error %d\n", MODNAME, ret);
         return ret;
