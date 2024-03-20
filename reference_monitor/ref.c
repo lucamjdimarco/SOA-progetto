@@ -68,11 +68,11 @@ static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
 static int open_prehandler(struct kprobe *p, struct pt_regs *regs)
 {
     int dfd = (int) regs->di;
-    //struct filename *filename = (struct filename *)regs->si;
-    const char __user *file_path = (const char __user *)regs->si;
+    struct filename *filename = (struct filename *)regs->si;
+    //const char __user *file_path = (const char __user *)regs->si;
     struct open_how *how = (struct open_how *)regs->dx;
 
-    //const char *file_path = filename->name;
+    const char *file_path = filename->name;
     int flags = how->flags;
     
     if(strncmp(file_path, "/run", 4) == 0) {
