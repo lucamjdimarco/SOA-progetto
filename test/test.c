@@ -1,8 +1,9 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/kprobes.h>
-#include <linux/path.h>
 #include <linux/fs.h>
+#include <linux/path.h>
+#include <linux/namei.h>
 
 #define PATH 256
 
@@ -28,6 +29,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
     char path[PATH];
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
+    
+    struct file *file;
+
+    unsigned int dfd = (unsigned int)regs->di;
+    
 
     if (filename) {
         if (strncpy_from_user(path, filename, PATH) < 0) {
@@ -39,23 +45,20 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             return 0;
         }
 
-        if (kern_path(path, LOOKUP_FOLLOW, &path_struct)) {
-            printk(KERN_INFO "Failed to get absolute path\n");
+        file = fget(dfd);
+        if(!file) {
+            printk(KERN_INFO "Failed to get file\n");
             return 0;
         }
-
-        abs_path = kmalloc(PATH_MAX, GFP_KERNEL);
-        if (!abs_path) {
-            printk(KERN_INFO "Failed to allocate memory for absolute path\n");
+        if(!dentry_path_raw(file->f_path.dentry, path, PATH)) {
+            printk(KERN_INFO "Failed to get file path\n");
+            fput(file);
             return 0;
         }
-
-        path_get(&path_struct);
-        abs_path = d_path(&path_struct, abs_path, PATH_MAX);
-        printk(KERN_INFO "Absolute File Path: %s\n", abs_path);
-        kfree(abs_path);
-
-        //printk(KERN_INFO "File Path: %s\n", path);
+        
+        
+        printk(KERN_INFO "File Path: %s\n", path);
+        fput(file);
     } else {
         printk(KERN_INFO "No filename provided\n");
     }
