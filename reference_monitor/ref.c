@@ -67,11 +67,12 @@ static int open_kernel_prehandler(struct kprobe *p, struct pt_regs *regs) {
 //apertura file di alto livello --> syscall sys_openat2
 static int open_prehandler(struct kprobe *p, struct pt_regs *regs)
 {
-    int dfd = regs->di;
-    struct filename *filename = (struct filename *)regs->si;
+    int dfd = (int) regs->di;
+    //struct filename *filename = (struct filename *)regs->si;
+    const char __user *file_path = (const char __user *)regs->si;
     struct open_how *how = (struct open_how *)regs->dx;
 
-    const char *file_path = filename->name;
+    //const char *file_path = filename->name;
     int flags = how->flags;
     
     if(strncmp(file_path, "/run", 4) == 0) {
@@ -96,19 +97,19 @@ static struct kprobe kp_do_sys_open = {
 };
 
 int init_module(void) {
-    int ret;
+    int return_value;
 
-    ret = register_kprobe(&kp_do_filp_open);
-    if (ret < 0) {
-        printk(KERN_ERR "%s: Failed to register do_filp_open kprobe, error %d\n", MODNAME, ret);
-        return ret;
+    return_value = register_kprobe(&kp_do_filp_open);
+    if (return_value < 0) {
+        printk(KERN_ERR "%s: Failed to register do_filp_open kprobe, error %d\n", MODNAME, return_value);
+        return return_value;
     }
     printk(KERN_INFO "%s: Kprobe do_filp_open registered successfully\n", MODNAME);
     
-    ret = register_kprobe(&kp_do_sys_open);
-    if (ret < 0) {
-        printk(KERN_ERR "%s: Failed to register do_sys_open kprobe, error %d\n", MODNAME, ret);
-        return ret;
+    return_value = register_kprobe(&kp_do_sys_open);
+    if (return_value < 0) {
+        printk(KERN_ERR "%s: Failed to register do_sys_open kprobe, error %d\n", MODNAME, return_value);
+        return return_value;
     }
     printk(KERN_INFO "%s: Kprobe do_sys_open registered successfully\n", MODNAME);
     return 0;
