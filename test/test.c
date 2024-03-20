@@ -6,6 +6,21 @@
 
 static struct kprobe kp;
 
+int strncmp_custom(const char *s1, const char *s2, size_t n) {
+    size_t i;
+    for (i = 0; i < n; i++) {
+        
+        if (s1[i] != s2[i]) {
+            return s1[i] - s2[i];
+        }
+        if (s1[i] == '\0' || s2[i] == '\0') {
+            break;
+        }
+    }
+
+    return 0;
+}
+
 /* Funzione di gestione pre-intercettazione */
 static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
@@ -17,6 +32,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             printk(KERN_INFO "Failed to copy filename from user space\n");
             return 0;
         }
+
+        if(strncmp_custom(filename, "/run", 4) == 0) {
+            return 0;
+        }
+        
         printk(KERN_INFO "File Path: %s\n", path);
     } else {
         printk(KERN_INFO "No filename provided\n");
