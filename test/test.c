@@ -29,10 +29,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
     char path[PATH];
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
-    
-    struct file *file;
 
-    unsigned int dfd = (unsigned int)regs->di;
+    //unsigned int dfd = (unsigned int)regs->di;
+    //manca il fatto che non recupera il path assoluto sempre
+    //non ancora gestisco i flag
+
     
 
     if (filename) {
@@ -44,21 +45,8 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         if(strncmp_custom(filename, "/run", 4) == 0) {
             return 0;
         }
-
-        file = fget(dfd);
-        if(!file) {
-            printk(KERN_INFO "Failed to get file\n");
-            return 0;
-        }
-        if(!dentry_path_raw(file->f_path.dentry, path, PATH)) {
-            printk(KERN_INFO "Failed to get file path\n");
-            fput(file);
-            return 0;
-        }
-        
         
         printk(KERN_INFO "File Path: %s\n", path);
-        fput(file);
     } else {
         printk(KERN_INFO "No filename provided\n");
     }
