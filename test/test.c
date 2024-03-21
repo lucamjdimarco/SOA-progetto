@@ -26,30 +26,6 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }
 
-char *full_path_user(int dfd, const __user char *user_path){
-	struct path path_struct;
-	char *tpath;
-	char *path;
-	int error = -EINVAL,flag=0;
-	unsigned int lookup_flags = 0;
-
-	tpath=kmalloc(1024,GFP_KERNEL);
-	if(tpath == NULL)  return NULL;
-	if (!(flag & AT_SYMLINK_NOFOLLOW))    lookup_flags |= LOOKUP_FOLLOW;
-	error = user_path_at(dfd, user_path, lookup_flags, &path_struct);
-	if(error){
-		//printk("%s: File %s does not exist. Error is %d\n", MODNAME, user_path, error);
-		kfree(tpath);
-		return NULL;
-	}
-	
-	path = d_path(&path_struct, tpath, 1024);
-	kfree(tpath);		
-	return path;
-
-}
-
-
 /* Funzione di gestione pre-intercettazione */
 static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
@@ -71,8 +47,6 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         if(strncmp_custom(filename, "/run", 4) == 0) {
             return 0;
         }
-
-        path = full_path_user(dfd, filename);
         
         printk(KERN_INFO "File Path: %s\n", path);
         
