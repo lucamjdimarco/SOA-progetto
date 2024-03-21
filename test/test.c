@@ -5,7 +5,8 @@
 #include <linux/path.h>
 #include <linux/namei.h>
 
-#define PATH 256
+#define PATH 4096
+
 
 static struct kprobe kp;
 
@@ -24,10 +25,40 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }
 
+int get_absolute_path(const char __user *filename, char *buffer, size_t buf_size) {
+    struct path path;
+    int error = -EINVAL;
+    unsigned int lookup_flags = LOOKUP_FOLLOW; // Segue i link simbolici di default
+
+    if (!filename || !buffer) return -EINVAL;
+
+    // Risolve il percorso dell'utente in una struct path
+    error = user_path_at(AT_FDCWD, filename, lookup_flags, &path);
+    if (error) return error;
+
+    // Converte la struct path in una stringa di percorso, verificando la dimensione del buffer
+    char *ret_ptr = d_path(&path, buffer, buf_size);
+    if (IS_ERR(ret_ptr)) {
+        error = PTR_ERR(ret_ptr);
+    } else {
+        // Copia il percorso nel buffer fornito dal chiamante, se desiderato
+        if (ret_ptr != buffer) {
+            strncpy(buffer, ret_ptr, buf_size);
+            buffer[buf_size - 1] = '\0'; // Assicura la terminazione della stringa
+        }
+        error = 0; // Successo
+    }
+
+    path_put(&path); // Rilascia la reference acquisita da user_path_at
+    return error;
+}
+
+
 /* Funzione di gestione pre-intercettazione */
 static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
     char path[PATH];
+    char absolute_path[PATH_MAX]; // Buffer per il percorso assoluto
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
 
     //unsigned int dfd = (unsigned int)regs->di;
@@ -46,7 +77,12 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             return 0;
         }
         
-        printk(KERN_INFO "File Path: %s\n", path);
+        //printk(KERN_INFO "File Path: %s\n", path);
+        if (get_absolute_path(filename, absolute_path, PATH_MAX) == 0) {
+            printk(KERN_INFO "Absolute File Path: %s\n", absolute_path);
+        } else {
+            printk(KERN_INFO "Failed to get absolute path\n");
+        }
     } else {
         printk(KERN_INFO "No filename provided\n");
     }
