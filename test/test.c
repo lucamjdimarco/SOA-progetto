@@ -26,38 +26,26 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }
 
-int get_absolute_path(int dfd, const char __user *filename, char *buffer) {
-    struct path path;
-    unsigned int lookup_flags = LOOKUP_FOLLOW; // Segue i link simbolici di default
-    int error;
+char *full_path_user(int dfd, const __user char *user_path){
+	struct path path_struct;
+	char *tpath;
+	char *path;
+	int error = -EINVAL,flag=0;
+	unsigned int lookup_flags = 0;
 
-    buf_path = kmalloc(1024, GFP_KERNEL);
-    if (!buf_path) {
-        return -ENOMEM;
-    }
-    error = user_path_at(dfd, filename, lookup_flags, &path);
-    if (error) {
-        kfree(buf_path);
-        return error;
-    }
-    
-    //path = d_path(&path, buf_path, 1024);
-    char *ret_ptr = d_path(&path, buf_path, 1024);
-    if (IS_ERR(path)) {
-        kfree(buf_path);
-        return PTR_ERR(path);
-    } else {
-        strncpy(buffer, buf_path, 1024);
-        buffer[1024 - 1] = '\0'; // Assicura la terminazione della stringa
-        error = 0; // Successo
-    }
-    kfree(buf_path);
-
-    path_put(&path);
-
-    return error;
-    
-
+	tpath=kmalloc(1024,GFP_KERNEL);
+	if(tpath == NULL)  return NULL;
+	if (!(flag & AT_SYMLINK_NOFOLLOW))    lookup_flags |= LOOKUP_FOLLOW;
+	error = user_path_at(dfd, user_path, lookup_flags, &path_struct);
+	if(error){
+		//printk("%s: File %s does not exist. Error is %d\n", MODNAME, user_path, error);
+		kfree(tpath);
+		return NULL;
+	}
+	
+	path = d_path(&path_struct, tpath, 1024);
+	kfree(tpath);		
+	return path;
 
 }
 
@@ -66,7 +54,6 @@ int get_absolute_path(int dfd, const char __user *filename, char *buffer) {
 static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
     char path[PATH];
-    char absolute_path[PATH]; // Buffer per il percorso assoluto
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
 
     unsigned int dfd = (unsigned int)regs->di;
@@ -84,13 +71,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         if(strncmp_custom(filename, "/run", 4) == 0) {
             return 0;
         }
+
+        path = full_path_user(dfd, filename);
         
-        //printk(KERN_INFO "File Path: %s\n", path);
-        if (get_absolute_path(dfd, filename, absolute_path) == 0) {
-            printk(KERN_INFO "Absolute File Path: %s\n", absolute_path);
-        } else {
-            printk(KERN_INFO "Failed to get absolute path\n");
-        }
+        printk(KERN_INFO "File Path: %s\n", path);
+        
     } else {
         printk(KERN_INFO "No filename provided\n");
     }
