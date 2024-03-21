@@ -4,8 +4,9 @@
 #include <linux/fs.h>
 #include <linux/path.h>
 #include <linux/namei.h>
+#include <linux/slab.h>
 
-#define PATH 4096
+#define PATH 256
 
 
 static struct kprobe kp;
@@ -25,32 +26,39 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }
 
-int get_absolute_path(const char __user *filename, char *buffer, size_t buf_size) {
+int get_absolute_path(int dfd, const char __user *filename, char *buffer) {
     struct path path;
-    int error = -EINVAL;
     unsigned int lookup_flags = LOOKUP_FOLLOW; // Segue i link simbolici di default
+    int error;
 
-    if (!filename || !buffer) return -EINVAL;
-
-    // Risolve il percorso dell'utente in una struct path
-    error = user_path_at(AT_FDCWD, filename, lookup_flags, &path);
-    if (error) return error;
-
-    // Converte la struct path in una stringa di percorso, verificando la dimensione del buffer
-    char *ret_ptr = d_path(&path, buffer, buf_size);
-    if (IS_ERR(ret_ptr)) {
-        error = PTR_ERR(ret_ptr);
+    buf_path = kmalloc(1024, GFP_KERNEL);
+    if (!buf_path) {
+        return -ENOMEM;
+    }
+    error = user_path_at(dfd, filename, lookup_flags, &path);
+    if (error) {
+        kfree(buf_path);
+        return error;
+    }
+    
+    //path = d_path(&path, buf_path, 1024);
+    char *ret_ptr = d_path(&path, buf_path, 1024);
+    if (IS_ERR(path)) {
+        kfree(buf_path);
+        return PTR_ERR(path);
     } else {
-        // Copia il percorso nel buffer fornito dal chiamante, se desiderato
-        if (ret_ptr != buffer) {
-            strncpy(buffer, ret_ptr, buf_size);
-            buffer[buf_size - 1] = '\0'; // Assicura la terminazione della stringa
-        }
+        strncpy(buffer, buf_path, 1024);
+        buffer[1024 - 1] = '\0'; // Assicura la terminazione della stringa
         error = 0; // Successo
     }
+    kfree(buf_path);
 
-    path_put(&path); // Rilascia la reference acquisita da user_path_at
+    path_put(&path);
+
     return error;
+    
+
+
 }
 
 
@@ -58,10 +66,10 @@ int get_absolute_path(const char __user *filename, char *buffer, size_t buf_size
 static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
     char path[PATH];
-    char absolute_path[PATH_MAX]; // Buffer per il percorso assoluto
+    char absolute_path[PATH]; // Buffer per il percorso assoluto
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
 
-    //unsigned int dfd = (unsigned int)regs->di;
+    unsigned int dfd = (unsigned int)regs->di;
     //manca il fatto che non recupera il path assoluto sempre
     //non ancora gestisco i flag
 
@@ -78,7 +86,7 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         }
         
         //printk(KERN_INFO "File Path: %s\n", path);
-        if (get_absolute_path(filename, absolute_path, PATH_MAX) == 0) {
+        if (get_absolute_path(dfd, filename, absolute_path) == 0) {
             printk(KERN_INFO "Absolute File Path: %s\n", absolute_path);
         } else {
             printk(KERN_INFO "Failed to get absolute path\n");
