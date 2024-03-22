@@ -12,6 +12,7 @@
 #include <linux/dcache.h>
 #include <linux/spinlock.h>  // for spin_lock, spin_unlock
 #include <linux/errno.h>
+#include <linux/file.h>
 
 #define PATH 256
 
@@ -73,22 +74,29 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
 }*/
 
 int get_full_path(int dfd){
-    char *tmp = (char*)__get_free_page(GFP_TEMPORARY);
+    char *tmp = (char*)__get_free_page(SLAB_TEMPORARY);
 
-    file *file = fget(dfd);
+    struct file *file = fget(dfd);
+    
     if (!file) {
-        goto out
+    	free_page((unsigned long)tmp);
+        return 1;
     }
 
     char *path = d_path(&file->f_path, tmp, PAGE_SIZE);
     if (IS_ERR(path)) {
-        printk("error: %d\n", (int)path);
-        goto out;
+    	
+        //printk("error: %d\n", (int)path);
+        free_page((unsigned long)tmp);
+        return 1;
     }
+    
+    printk(KERN_INFO "Sono alla fine\n");
 
-    printk("path: %s\n", path);
-out:
+    printk(KERN_INFO "path: %s\n", path);
+    printk(KERN_INFO "tmp: %s\n", tmp);
     free_page((unsigned long)tmp);
+    return 0;
 }
 
 
@@ -115,28 +123,20 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             printk(KERN_INFO "Failed to copy filename from user space\n");
             return 0;
         }
+        
+        if(strncmp_custom(filename, "/run", 4) == 0) {
+            return 0;
+        }
 
         //se fd == AT_FDCWD allora il path è assoluto
         if(fd != AT_FDCWD){
+        	//printk(KERN_INFO "path non abs: %s\n", path);
             //ret = get_full_path(fd, filename);
             get_full_path(fd);
-        }
-
-        /*if(ret < 0){
-            printk(KERN_INFO "Failed to get full path\n");
-            return 0;
-        } else {
-            printk(KERN_INFO "Full Path: %s\n", full_path);
-        } */
-
-
-
-        /*if(get_full_path(dfd, full_path) < 0){
-            printk(KERN_INFO "Failed to get full path\n");
-            return 0;
-        } else {
-            printk(KERN_INFO "Full Path: %s\n", full_path);
+        } /*else {
+        	printk(KERN_INFO "File Path: %s\n", path);
         }*/
+        
 
 
         /*if(strncmp_custom(filename, "/run", 4) == 0) {
