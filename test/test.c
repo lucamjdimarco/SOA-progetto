@@ -72,35 +72,27 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }*/
 
-int get_full_path(int fd, char *full_path) {
-    struct file *file;
-    struct path path;
-    char *tmp_path;
+char *get_full_path(int dfd, const __user char *user_path){
+	struct path path_struct;
+	char *tpath;
+	char *path;
+	int error = -EINVAL,flag=0;
+	unsigned int lookup_flags = 0;
 
-    // Ottenere il puntatore alla struttura file dalla tabella dei file del processo corrente
-    file = fget(fd);
-    if (!file) {
-        // Se il file descriptor non è valido, restituisci un errore
-        return -EBADF;
-    }
+	tpath=kmalloc(1024,GFP_KERNEL);
+	if(tpath == NULL)  return NULL;
+	if (!(flag & AT_SYMLINK_NOFOLLOW))    lookup_flags |= LOOKUP_FOLLOW;
+	error = user_path_at(dfd, user_path, lookup_flags, &path_struct);
+	if(error){
+		//printk("%s: File %s does not exist. Error is %d\n", MODNAME, user_path, error);
+		kfree(tpath);
+		return NULL;
+	}
+	
+	path = d_path(&path_struct, tpath, 1024);
+	kfree(tpath);		
+	return path;
 
-    // Ottenere il percorso del file dalla struttura file
-    path = file->f_path;
-    // Incrementare il riferimento al percorso per garantire che non venga deallocato durante l'accesso
-    path_get(&path);
-
-    // Ottenere il percorso assoluto del file
-    tmp_path = d_path(&path, full_path, PATH_MAX);
-
-    // Rilasciare il riferimento al percorso
-    path_put(&path);
-
-    if (IS_ERR(tmp_path)) {
-        // Se si verifica un errore nella conversione del percorso, restituisci l'errore
-        return PTR_ERR(tmp_path);
-    }
-
-    return 0;
 }
 
 /* Funzione di gestione pre-intercettazione */
@@ -128,7 +120,7 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
 
         //se fd == AT_FDCWD allora il path è assoluto
         if(fd != AT_FDCWD){
-            ret = get_full_path(fd, full_path);
+            ret = get_full_path(fd, filename);
         }
 
         if(ret < 0){
