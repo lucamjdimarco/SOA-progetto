@@ -36,6 +36,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //manca il fatto che non recupera il path assoluto sempre
     //non ancora gestisco i flag
 
+    struct file *file;
+    struct path file_path;
+    struct dentry *dentry;
+    char *full_path;
+    char *ret;
     
 
     if (filename) {
@@ -44,11 +49,30 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             return 0;
         }
 
-        if(strncmp_custom(filename, "/run", 4) == 0) {
+        file = fget(dfd);
+        if(!file) {
+            printk(KERN_INFO "Failed to get file\n");
             return 0;
         }
+
+        file_path = file->f_path;
+        //dentry = file_path.dentry;
+        ret = d_path(file_path, full_path, PATH);
+        if(ret == NULL) {
+            printk(KERN_INFO "Failed to get full path\n");
+            return 0;
+        }
+        printk(KERN_INFO "Full Path: %s\n", full_path);
+
+
+
+        /*if(strncmp_custom(filename, "/run", 4) == 0) {
+            return 0;
+        }
+
+
         
-        printk(KERN_INFO "File Path: %s\n", path);
+        printk(KERN_INFO "File Path: %s\n", path);*/
         
     } else {
         printk(KERN_INFO "No filename provided\n");
