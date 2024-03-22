@@ -6,6 +6,12 @@
 #include <linux/namei.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
+#include <linux/fdtable.h>
+#include <linux/uaccess.h>
+#include <linux/fs_struct.h>
+#include <linux/dcache.h>
+#include <linux/spinlock.h>  // for spin_lock, spin_unlock
+#include <linux/errno.h>
 
 #define PATH 256
 
