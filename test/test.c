@@ -72,28 +72,26 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }*/
 
-char *get_full_path(int dfd, const __user char *user_path){
-	struct path path_struct;
-	char *tpath;
-	char *path;
-	int error = -EINVAL,flag=0;
-	unsigned int lookup_flags = 0;
+int get_full_path(int dfd){
+    char *tmp = (char*)__get_free_page(GFP_TEMPORARY);
 
-	tpath=kmalloc(1024,GFP_KERNEL);
-	if(tpath == NULL)  return NULL;
-	if (!(flag & AT_SYMLINK_NOFOLLOW))    lookup_flags |= LOOKUP_FOLLOW;
-	error = user_path_at(dfd, user_path, lookup_flags, &path_struct);
-	if(error){
-		//printk("%s: File %s does not exist. Error is %d\n", MODNAME, user_path, error);
-		kfree(tpath);
-		return NULL;
-	}
-	
-	path = d_path(&path_struct, tpath, 1024);
-	kfree(tpath);		
-	return path;
+    file *file = fget(dfd);
+    if (!file) {
+        goto out
+    }
 
+    char *path = d_path(&file->f_path, tmp, PAGE_SIZE);
+    if (IS_ERR(path)) {
+        printk("error: %d\n", (int)path);
+        goto out;
+    }
+
+    printk("path: %s\n", path);
+out:
+    free_page((unsigned long)tmp);
 }
+
+
 
 /* Funzione di gestione pre-intercettazione */
 static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
@@ -120,15 +118,16 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
 
         //se fd == AT_FDCWD allora il path è assoluto
         if(fd != AT_FDCWD){
-            ret = get_full_path(fd, filename);
+            //ret = get_full_path(fd, filename);
+            get_full_path(fd);
         }
 
-        if(ret < 0){
+        /*if(ret < 0){
             printk(KERN_INFO "Failed to get full path\n");
             return 0;
         } else {
             printk(KERN_INFO "Full Path: %s\n", full_path);
-        } 
+        } */
 
 
 
