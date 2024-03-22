@@ -5,6 +5,7 @@
 #include <linux/path.h>
 #include <linux/namei.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 
 #define PATH 256
 
@@ -26,6 +27,45 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }
 
+int get_full_path(unsigned int fd, char *full_path){
+    char *tmp;
+    //char *pathname;
+    struct file *file;
+    struct path *path;
+
+    struct files_struct *files = current->files;
+
+    spin_lock(&files->file_lock);
+    file = fcheck_files(files, fd);
+    if (!file) {
+        spin_unlock(&files->file_lock);
+        return -ENOENT;
+    }
+
+    path = &file->f_path;
+    path_get(path);
+    spin_unlock(&files->file_lock);
+
+    tmp = (char *)__get_free_page(GFP_KERNEL);
+
+    if (!tmp) {
+        path_put(path);
+        return -ENOMEM;
+    }
+
+    full_path = d_path(path, tmp, PAGE_SIZE);
+    path_put(path);
+
+    if (IS_ERR(pathname)) {
+        free_page((unsigned long)tmp);
+        return PTR_ERR(pathname);
+    }
+
+    free_page((unsigned long)tmp);
+
+    return 0;
+}
+
 /* Funzione di gestione pre-intercettazione */
 static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //printk(KERN_INFO "Intercepted do_sys_openat2\n");
@@ -36,11 +76,9 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     //manca il fatto che non recupera il path assoluto sempre
     //non ancora gestisco i flag
 
-    struct file *file;
-    struct path file_path;
-    struct dentry *dentry;
-    char *full_path;
-    char *ret;
+    char *full_path = kmalloc(PATH, GFP_KERNEL);
+
+
     
 
     if (filename) {
@@ -49,21 +87,12 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             return 0;
         }
 
-        file = fget(dfd);
-        if(!file) {
-            printk(KERN_INFO "Failed to get file\n");
-            return 0;
-        }
-
-        file_path = file->f_path;
-        //dentry = file_path.dentry;
-        ret = d_path(file_path, full_path, PATH);
-        if(ret == NULL) {
+        if(get_full_path(dfd, full_path) < 0){
             printk(KERN_INFO "Failed to get full path\n");
             return 0;
+        } else {
+            printk(KERN_INFO "Full Path: %s\n", full_path);
         }
-        printk(KERN_INFO "Full Path: %s\n", full_path);
-
 
 
         /*if(strncmp_custom(filename, "/run", 4) == 0) {
