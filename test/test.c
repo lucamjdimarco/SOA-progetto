@@ -42,7 +42,7 @@ int get_full_path(unsigned int fd, char *full_path){
     struct files_struct *files = current->files;
 
     spin_lock(&files->file_lock);
-    file = fcheck_files(files, fd);
+    file = files_lookup_fd_rcu(files, fd);
     if (!file) {
         spin_unlock(&files->file_lock);
         return -ENOENT;
@@ -62,9 +62,9 @@ int get_full_path(unsigned int fd, char *full_path){
     full_path = d_path(path, tmp, PAGE_SIZE);
     path_put(path);
 
-    if (IS_ERR(pathname)) {
+    if (IS_ERR(full_path)) {
         free_page((unsigned long)tmp);
-        return PTR_ERR(pathname);
+        return PTR_ERR(full_path);
     }
 
     free_page((unsigned long)tmp);
