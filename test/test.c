@@ -73,7 +73,7 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }*/
 
-int get_full_path(int dfd){
+int get_full_path(int dfd, char *full_path){
     char *tmp = (char*)__get_free_page(SLAB_TEMPORARY);
 
     struct file *file = fget(dfd);
@@ -91,10 +91,12 @@ int get_full_path(int dfd){
         return 1;
     }
     
-    printk(KERN_INFO "Sono alla fine\n");
+    //printk(KERN_INFO "Sono alla fine\n");
 
-    printk(KERN_INFO "path: %s\n", path);
-    printk(KERN_INFO "tmp: %s\n", tmp);
+    //printk(KERN_INFO "path: %s\n", path);
+    
+    strncpy(full_path, path, PATH);
+
     free_page((unsigned long)tmp);
     return 0;
 }
@@ -108,13 +110,17 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
 
     int fd = (int)regs->di;
-    //manca il fatto che non recupera il path assoluto sempre
     //non ancora gestisco i flag
 
     char *full_path = kmalloc(PATH, GFP_KERNEL);
     int ret = 0;
 
     
+    struct open_how __user *user_how = (struct open_how __user *)regs->dx;
+    struct open_how how;
+
+    
+
     
     
 
@@ -132,20 +138,27 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         if(fd != AT_FDCWD){
         	//printk(KERN_INFO "path non abs: %s\n", path);
             //ret = get_full_path(fd, filename);
-            get_full_path(fd);
+            get_full_path(fd, full_path);
+            printk(KERN_INFO "path: %s\n", full_path);
         } /*else {
         	printk(KERN_INFO "File Path: %s\n", path);
         }*/
-        
-
-
         /*if(strncmp_custom(filename, "/run", 4) == 0) {
             return 0;
+        }        
+        printk(KERN_INFO "File Path: %s\n", path);*/
+
+        if (copy_from_user(&how, user_how, sizeof(how))) {
+        printk(KERN_INFO "Failed to copy open_how from user space\n");
+        return 0;
         }
 
-
-        
-        printk(KERN_INFO "File Path: %s\n", path);*/
+        // Controlla se il file è aperto in scrittura o lettura/scrittura
+        if (how.flags & O_WRONLY) {
+            printk(KERN_INFO "File opened in write-only mode.\n");
+        } else if (how.flags & O_RDWR) {
+            printk(KERN_INFO "File opened in read-write mode.\n");
+        }
         
     } else {
         printk(KERN_INFO "No filename provided\n");
