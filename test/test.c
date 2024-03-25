@@ -110,19 +110,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
 
     int fd = (int)regs->di;
-    //non ancora gestisco i flag
 
     char *full_path = kmalloc(PATH, GFP_KERNEL);
-    int ret = 0;
-
-    
     struct open_how __user *user_how = (struct open_how __user *)regs->dx;
     struct open_how how;
 
-    
-
-    
-    
 
     if (filename) {
         if (strncpy_from_user(path, filename, PATH) < 0) {
@@ -136,21 +128,14 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
 
         //se fd == AT_FDCWD allora il path è assoluto
         if(fd != AT_FDCWD){
-        	//printk(KERN_INFO "path non abs: %s\n", path);
-            //ret = get_full_path(fd, filename);
+        	
             get_full_path(fd, full_path);
             printk(KERN_INFO "path: %s\n", full_path);
-        } /*else {
-        	printk(KERN_INFO "File Path: %s\n", path);
-        }*/
-        /*if(strncmp_custom(filename, "/run", 4) == 0) {
-            return 0;
-        }        
-        printk(KERN_INFO "File Path: %s\n", path);*/
+        } 
 
         if (copy_from_user(&how, user_how, sizeof(how))) {
-        printk(KERN_INFO "Failed to copy open_how from user space\n");
-        return 0;
+            printk(KERN_INFO "Failed to copy open_how from user space\n");
+            return 0;
         }
 
         // Controlla se il file è aperto in scrittura o lettura/scrittura
