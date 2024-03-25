@@ -154,8 +154,16 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     struct open_how *how = (struct open_how *)regs->dx;
 
     //printk(KERN_INFO "fd: %d\n", fd);
-    printk(KERN_INFO "user: %d\n", user);
-    printk(KERN_INFO "kernel: %d\n", kernel);
+    //printk(KERN_INFO "user: %s\n", user);
+    //printk(KERN_INFO "kernel: %s\n", kernel);
+
+    if(user != NULL){
+        printk(KERN_INFO "user: %s\n", user);
+    }
+
+    if(kernel != NULL){
+        printk(KERN_INFO "kernel: %s\n", kernel);
+    }
 
     //char *full_path = kmalloc(PATH, GFP_KERNEL);
     //int ret;
