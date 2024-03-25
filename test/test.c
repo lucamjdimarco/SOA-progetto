@@ -14,7 +14,7 @@
 #include <linux/errno.h>
 #include <linux/file.h>
 
-#define PATH 256
+#define PATH 512
 
 //krpobe struct
 static struct kprobe kp;
@@ -39,6 +39,7 @@ int get_absolute_path(const char __user *filename) {
     int dfd = AT_FDCWD;
     char *ret_ptr = NULL;
     int error = -EINVAL;
+    int flag = 0;
     unsigned int lookup_flags = 0;
     char *tpath = kmalloc(1024, GFP_KERNEL);
 
@@ -46,8 +47,10 @@ int get_absolute_path(const char __user *filename) {
         lookup_flags |= LOOKUP_FOLLOW;
 
     error = user_path_at(dfd, filename, lookup_flags, &path);
-    if (error)
+    if (error) {
+    	//printk("err\n");
         goto out;
+     }
 
     ret_ptr = d_path(&path, tpath, 1024);
     printk("%s\n", ret_ptr);
@@ -71,6 +74,11 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
 
     int fd = (int)(regs->di);
     struct open_how *how = (struct open_how *)regs->dx;
+    
+    //char *path = kmalloc(PATH, GFP_KERNEL);
+
+    // NON GESTISCO IL VALORE DI RITORNO DELLA STRINGA DEL PATH COMPLETO
+    //LA STAMPO SOLTANTO
 
     int ret = 0;
 
@@ -85,7 +93,7 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         }
 
         if(strncmp_custom(path, "/", 1) != 0) {
-            ret = get_absolute_path(path);
+            ret = get_absolute_path(filename);
             if (ret != 0) {
                 printk(KERN_INFO "Failed to get full path\n");
                 return 0;
