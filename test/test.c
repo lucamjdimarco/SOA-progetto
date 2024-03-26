@@ -17,7 +17,7 @@
 #define PATH 512
 
 //krpobe struct
-static struct kprobe kp;
+static struct kprobe kp_openat2;
 
 int strncmp_custom(const char *s1, const char *s2, size_t n) {
     size_t i;
@@ -48,7 +48,6 @@ char *get_absolute_path(const char __user *filename) {
 
     error = user_path_at(dfd, filename, lookup_flags, &path);
     if (error) {
-    	//printk("err\n");
         goto out;
      }
 
@@ -65,22 +64,12 @@ out:
 
 
 
-/* Funzione di gestione pre-intercettazione */
-static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
-    //printk(KERN_INFO "Intercepted do_sys_openat2\n");
+
+static int handler_openat2(struct kprobe *p, struct pt_regs *regs) {
     char path[PATH];
     const char __user *filename = (const char __user *)regs->si; // Registri che contengono il puntatore al path del file
-
-
-    int fd = (int)(regs->di);
+    //int fd = (int)(regs->di);
     struct open_how *how = (struct open_how *)regs->dx;
-    
-    //char *path = kmalloc(PATH, GFP_KERNEL);
-
-    // NON GESTISCO IL VALORE DI RITORNO DELLA STRINGA DEL PATH COMPLETO
-    //LA STAMPO SOLTANTO
-
-    //int ret = 0;
     char *ret_ptr = NULL;
 
     if (filename) {
@@ -105,8 +94,6 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             printk(KERN_INFO "Full path: %s\n", path);
         }
         
-
-        // Controlla se il file è aperto in scrittura o lettura/scrittura
         if ((how->flags & O_WRONLY) || (how->flags & O_CREAT) || (how->flags & O_TRUNC) || (how->flags & O_APPEND) || (how->flags & O_RDWR)) {
             printk(KERN_INFO "File opened in write mode.\n");
         }
@@ -122,20 +109,20 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
 }
 
 static int __init kprobe_init(void) {
-    kp.pre_handler = handler_pre;
-    kp.symbol_name = "do_sys_openat2"; // Nome della funzione da intercettare
+    kp_openat2.pre_handler = handler_openat2;
+    kp_openat2.symbol_name = "do_sys_openat2"; // Nome della funzione da intercettare
 
-    if (register_kprobe(&kp) < 0) {
-        printk(KERN_INFO "Failed to register kprobe\n");
+    if (register_kprobe(&kp_openat2) < 0) {
+        printk(KERN_INFO "Failed to register kprobe openat2\n");
         return -1;
     }
-    printk(KERN_INFO "Kprobe registered successfully\n");
+    printk(KERN_INFO "Kprobe openat2 registered successfully\n");
     return 0;
 }
 
 static void __exit kprobe_exit(void) {
-    unregister_kprobe(&kp);
-    printk(KERN_INFO "Kprobe unregistered\n");
+    unregister_kprobe(&kp_openat2);
+    printk(KERN_INFO "Kprobe openat2 unregistered\n");
 }
 
 module_init(kprobe_init);
