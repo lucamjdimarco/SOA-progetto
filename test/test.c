@@ -85,7 +85,7 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
 
     if (filename) {
         if (strncpy_from_user(path, filename, PATH) < 0) {
-            printk(KERN_INFO "Failed to copy filename from user space\n");
+            //printk(KERN_INFO "Failed to copy filename from user space\n");
             return 0;
         }
         
@@ -101,6 +101,8 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
             } else {
                 printk(KERN_INFO "Full path: %s\n", ret_ptr);
             }
+        } else {
+            printk(KERN_INFO "Full path: %s\n", path);
         }
         
 
