@@ -95,7 +95,7 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
 
         if(strncmp_custom(path, "/", 1) != 0) {
             ret_ptr = get_absolute_path(filename);
-            if (ret == NULL) {
+            if (ret_ptr == NULL) {
                 printk(KERN_INFO "Failed to get full path\n");
                 return 0;
             } else {
@@ -107,10 +107,8 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         
 
         // Controlla se il file è aperto in scrittura o lettura/scrittura
-        if (how->flags & O_WRONLY) {
-            printk(KERN_INFO "File opened in write-only mode.\n");
-        } else if (how->flags & O_RDWR) {
-            printk(KERN_INFO "File opened in read-write mode.\n");
+        if ((how->flags & O_WRONLY) || (how->flags & O_CREAT) || (how->flags & O_TRUNC) || (how->flags & O_APPEND) || (how->flags & O_RDWR)) {
+            printk(KERN_INFO "File opened in write mode.\n");
         }
         
     } else {
