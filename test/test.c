@@ -34,7 +34,7 @@ int strncmp_custom(const char *s1, const char *s2, size_t n) {
     return 0;
 }
 
-int get_absolute_path(const char __user *filename) {
+char *get_absolute_path(const char __user *filename) {
     struct path path;
     int dfd = AT_FDCWD;
     char *ret_ptr = NULL;
@@ -53,13 +53,13 @@ int get_absolute_path(const char __user *filename) {
      }
 
     ret_ptr = d_path(&path, tpath, 1024);
-    printk("%s\n", ret_ptr);
+    //printk("%s\n", ret_ptr);
     kfree(tpath);
-    return 0;
+    return ret_ptr;
 
 out:
     kfree(tpath);
-    return error;
+    return NULL;
 }
 
 
@@ -80,7 +80,8 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
     // NON GESTISCO IL VALORE DI RITORNO DELLA STRINGA DEL PATH COMPLETO
     //LA STAMPO SOLTANTO
 
-    int ret = 0;
+    //int ret = 0;
+    char *ret_ptr = NULL;
 
     if (filename) {
         if (strncpy_from_user(path, filename, PATH) < 0) {
@@ -93,12 +94,12 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs) {
         }
 
         if(strncmp_custom(path, "/", 1) != 0) {
-            ret = get_absolute_path(filename);
-            if (ret != 0) {
+            ret_ptr = get_absolute_path(filename);
+            if (ret == NULL) {
                 printk(KERN_INFO "Failed to get full path\n");
                 return 0;
             } else {
-                printk(KERN_INFO "Full path: %s\n", path);
+                printk(KERN_INFO "Full path: %s\n", ret_ptr);
             }
         }
         
