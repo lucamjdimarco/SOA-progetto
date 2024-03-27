@@ -118,7 +118,9 @@ static int handler_filp_open(struct kprobe *p, struct pt_regs *regs) {
     const __user char *path_user = ((struct filename *)(regs->si))->uptr;
 	const char *path_kernel = ((struct filename *)(regs->si))->name;
 
-    if(path_user == NULL) {
+    char *ret_ptr = NULL;
+
+    /*if(path_user == NULL) {
         printk(KERN_INFO "No path user provided\n");
         //return 0;
     
@@ -131,11 +133,43 @@ static int handler_filp_open(struct kprobe *p, struct pt_regs *regs) {
     } else {
         printk(KERN_INFO "Path kernel: %s\n", path_kernel);
     
-    }
+    }*/
 
-    if(strncmp_custom(path_kernel, path_user, PATH) == 0) {
-        printk(KERN_INFO "Paths are equal\n");
-        return 0;
+    if(path_user == NULL){
+        //uso path kernel 
+        if(strncmp_custom(path_kernel, "/run", 4) == 0) {
+            return 0;
+        }
+
+        if(strncmp_custom(path_kernel, "/", 1) != 0) {
+            ret_ptr = get_absolute_path(path_kernel);
+            if (ret_ptr == NULL) {
+                printk(KERN_INFO "Failed to get full path do_filp_open\n");
+                return 0;
+            } else {
+                printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
+            }
+        } else {
+            printk(KERN_INFO "Full path do_filp_open: %s\n", path_kernel);
+        }
+
+    } else {
+        //uso path user
+        if(strncmp_custom(path_kernel, "/run", 4) == 0) {
+            return 0;
+        }
+
+        if(strncmp_custom(path_user, "/", 1) != 0) {
+            ret_ptr = get_absolute_path(path_user);
+            if (ret_ptr == NULL) {
+                printk(KERN_INFO "Failed to get full path do_filp_open\n");
+                return 0;
+            } else {
+                printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
+            }
+        } else {
+            printk(KERN_INFO "Full path do_filp_open: %s\n", path_user);
+        }
     }
 
     return 0;
