@@ -120,19 +120,25 @@ static int handler_filp_open(struct kprobe *p, struct pt_regs *regs) {
 
     if(path_user == NULL) {
         printk(KERN_INFO "No path user provided\n");
-        return 0;
+        //return 0;
     
     } else {
         printk(KERN_INFO "Path user: %s\n", path_user);
     }
     if(path_kernel == NULL) {
         printk(KERN_INFO "No path kernel provided\n");
-        return 0;
+        //return 0;
     } else {
         printk(KERN_INFO "Path kernel: %s\n", path_kernel);
     
     }
 
+    if(strncmp_custom(path_kernel, path_user, PATH) == 0) {
+        printk(KERN_INFO "Paths are equal\n");
+        return 0;
+    }
+
+    return 0;
 
 }
 
