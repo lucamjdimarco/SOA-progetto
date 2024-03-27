@@ -135,42 +135,49 @@ static int handler_filp_open(struct kprobe *p, struct pt_regs *regs) {
     
     }*/
 
-    if(path_user == NULL){
-        //uso path kernel 
-        if(strncmp_custom(path_kernel, "/run", 4) == 0) {
-            return 0;
-        }
-
-        if(strncmp_custom(path_kernel, "/", 1) != 0) {
-            ret_ptr = get_absolute_path(path_kernel);
-            if (ret_ptr == NULL) {
-                printk(KERN_INFO "Failed to get full path do_filp_open\n");
+    if ((op->open_flag & O_WRONLY) || (op->open_flag & O_CREAT) || (op->open_flag & O_TRUNC) || (op->open_flag & O_APPEND) || (op->open_flag & O_RDWR)) {
+            //printk(KERN_INFO "File opened in write mode.\n");
+            if(path_user == NULL){
+            //uso path kernel 
+            if(strncmp_custom(path_kernel, "/run", 4) == 0) {
                 return 0;
-            } else {
-                printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
             }
-        } else {
-            printk(KERN_INFO "Full path do_filp_open: %s\n", path_kernel);
-        }
 
+            if(strncmp_custom(path_kernel, "/", 1) != 0) {
+                ret_ptr = get_absolute_path(path_kernel);
+                if (ret_ptr == NULL) {
+                    printk(KERN_INFO "Failed to get full path do_filp_open\n");
+                    return 0;
+                } else {
+                    printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
+                }
+            } else {
+                printk(KERN_INFO "Full path do_filp_open: %s\n", path_kernel);
+            }
+
+        } else {
+            //uso path user
+            if(strncmp_custom(path_kernel, "/run", 4) == 0) {
+                return 0;
+            }
+
+            if(strncmp_custom(path_user, "/", 1) != 0) {
+                ret_ptr = get_absolute_path(path_user);
+                if (ret_ptr == NULL) {
+                    printk(KERN_INFO "Failed to get full path do_filp_open\n");
+                    return 0;
+                } else {
+                    printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
+                }
+            } else {
+                printk(KERN_INFO "Full path do_filp_open: %s\n", path_user);
+            }
+        }
     } else {
-        //uso path user
-        if(strncmp_custom(path_kernel, "/run", 4) == 0) {
-            return 0;
-        }
-
-        if(strncmp_custom(path_user, "/", 1) != 0) {
-            ret_ptr = get_absolute_path(path_user);
-            if (ret_ptr == NULL) {
-                printk(KERN_INFO "Failed to get full path do_filp_open\n");
-                return 0;
-            } else {
-                printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
-            }
-        } else {
-            printk(KERN_INFO "Full path do_filp_open: %s\n", path_user);
-        }
+        return 0;
     }
+
+    
 
     return 0;
 
