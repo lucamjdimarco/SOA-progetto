@@ -19,6 +19,8 @@
 //krpobe struct
 static struct kprobe kp_openat2;
 static struct kprobe kp_filp_open;
+static struct kprobe kp_rmdir;
+static struct kprobe kp_mkdir_at;
 
 int strncmp_custom(const char *s1, const char *s2, size_t n) {
     size_t i;
@@ -120,24 +122,9 @@ static int handler_filp_open(struct kprobe *p, struct pt_regs *regs) {
 
     char *ret_ptr = NULL;
 
-    /*if(path_user == NULL) {
-        printk(KERN_INFO "No path user provided\n");
-        //return 0;
-    
-    } else {
-        printk(KERN_INFO "Path user: %s\n", path_user);
-    }
-    if(path_kernel == NULL) {
-        printk(KERN_INFO "No path kernel provided\n");
-        //return 0;
-    } else {
-        printk(KERN_INFO "Path kernel: %s\n", path_kernel);
-    
-    }*/
-
     if ((op->open_flag & O_WRONLY) || (op->open_flag & O_CREAT) || (op->open_flag & O_TRUNC) || (op->open_flag & O_APPEND) || (op->open_flag & O_RDWR)) {
             //printk(KERN_INFO "File opened in write mode.\n");
-            if(path_user == NULL){
+        if(path_user == NULL){
             //uso path kernel 
             if(strncmp_custom(path_kernel, "/run", 4) == 0) {
                 return 0;
@@ -157,7 +144,7 @@ static int handler_filp_open(struct kprobe *p, struct pt_regs *regs) {
 
         } else {
             //uso path user
-            if(strncmp_custom(path_kernel, "/run", 4) == 0) {
+            if(strncmp_custom(path_user, "/run", 4) == 0) {
                 return 0;
             }
 
@@ -176,11 +163,106 @@ static int handler_filp_open(struct kprobe *p, struct pt_regs *regs) {
     } else {
         return 0;
     }
+    return 0;
+}
+
+static int handler_rmdir(struct kprobe *p, struct pt_regs *regs) {
+    
+    int fd = (int)regs->di;
+
+    const __user char *path_user = ((struct filename *)(regs->si))->uptr;
+	const char *path_kernel = ((struct filename *)(regs->si))->name;
+
+    char *ret_ptr = NULL;
+
+    if(path_user == NULL){
+        //uso path kernel 
+        if(strncmp_custom(path_kernel, "/run", 4) == 0) {
+            return 0;
+        }
+
+        if(strncmp_custom(path_kernel, "/", 1) != 0) {
+            ret_ptr = get_absolute_path(path_kernel);
+            if (ret_ptr == NULL) {
+                printk(KERN_INFO "Failed to get full path rmdir\n");
+                return 0;
+            } else {
+                printk(KERN_INFO "Full path rmdir: %s\n", ret_ptr);
+            }
+        } else {
+            printk(KERN_INFO "Full path rmdir: %s\n", path_kernel);
+        }
+
+    } else {
+        //uso path user
+        if(strncmp_custom(path_user, "/run", 4) == 0) {
+            return 0;
+        }
+
+        if(strncmp_custom(path_user, "/", 1) != 0) {
+            ret_ptr = get_absolute_path(path_user);
+            if (ret_ptr == NULL) {
+                printk(KERN_INFO "Failed to get full path rmdir\n");
+                return 0;
+            } else {
+                printk(KERN_INFO "Full path rmdir: %s\n", ret_ptr);
+            }
+        } else {
+            printk(KERN_INFO "Full path rmdir: %s\n", path_user);
+        }
+    }
+    
+    return 0;
+}
+
+static int handler_mkdirat(struct kprobe *p, struct pt_regs *regs) {
+    
+    int fd = (int)regs->di;
+
+    const __user char *path_user = ((struct filename *)(regs->si))->uptr;
+	const char *path_kernel = ((struct filename *)(regs->si))->name;
+
+    char *ret_ptr = NULL;
 
     
+    if(path_user == NULL){
+        //uso path kernel 
+        if(strncmp_custom(path_kernel, "/run", 4) == 0) {
+            return 0;
+        }
 
+        if(strncmp_custom(path_kernel, "/", 1) != 0) {
+            ret_ptr = get_absolute_path(path_kernel);
+            if (ret_ptr == NULL) {
+                printk(KERN_INFO "Failed to get full path do_filp_open\n");
+                return 0;
+            } else {
+                printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
+            }
+        } else {
+            printk(KERN_INFO "Full path do_filp_open: %s\n", path_kernel);
+        }
+
+    } else {
+        //uso path user
+        if(strncmp_custom(path_user, "/run", 4) == 0) {
+            return 0;
+        }
+
+        if(strncmp_custom(path_user, "/", 1) != 0) {
+            ret_ptr = get_absolute_path(path_user);
+            if (ret_ptr == NULL) {
+                printk(KERN_INFO "Failed to get full path do_filp_open\n");
+                return 0;
+            } else {
+                printk(KERN_INFO "Full path do_filp_open: %s\n", ret_ptr);
+            }
+        } else {
+            printk(KERN_INFO "Full path do_filp_open: %s\n", path_user);
+        }
+    }
+    
     return 0;
-
 }
 
 static int __init kprobe_init(void) {
@@ -190,6 +272,13 @@ static int __init kprobe_init(void) {
     kp_filp_open.pre_handler = handler_filp_open;
     kp_filp_open.symbol_name = "do_filp_open";
 
+    kp_rmdir.pre_handler = handler_rmdir;
+    kp_rmdir.symbol_name = "do_rmdir";
+
+    kp_mkdir_at.pre_handler = handler_mkdirat;
+    kp_mkdir_at.symbol_name = "do_mkdirat";
+
+
     if (register_kprobe(&kp_openat2) < 0) {
         printk(KERN_INFO "Failed to register kprobe openat2\n");
         return -1;
@@ -198,16 +287,30 @@ static int __init kprobe_init(void) {
         printk(KERN_INFO "Failed to register kprobe filp_open\n");
         return -1;
     }
+    if (register_kprobe(&kp_rmdir) < 0) {
+        printk(KERN_INFO "Failed to register kprobe rmdir\n");
+        return -1;
+    }
+    if (register_kprobe(&kp_mkdir_at) < 0) {
+        printk(KERN_INFO "Failed to register kprobe mkdirat\n");
+        return -1;
+    }
     printk(KERN_INFO "Kprobe openat2 registered successfully\n");
     printk(KERN_INFO "Kprobe filp_open registered successfully\n");
+    printk(KERN_INFO "Kprobe rmdir registered successfully\n");
+    printk(KERN_INFO "Kprobe mkdirat registered successfully\n");
     return 0;
 }
 
 static void __exit kprobe_exit(void) {
     unregister_kprobe(&kp_openat2);
     unregister_kprobe(&kp_filp_open);
+    unregister_kprobe(&kp_rmdir);
+    unregister_kprobe(&kp_mkdir_at);
     printk(KERN_INFO "Kprobe openat2 unregistered\n");
     printk(KERN_INFO "Kprobe filp_open unregistered\n");
+    printk(KERN_INFO "Kprobe rmdir unregistered\n");
+    printk(KERN_INFO "Kprobe mkdirat unregistered\n");
 }
 
 module_init(kprobe_init);
