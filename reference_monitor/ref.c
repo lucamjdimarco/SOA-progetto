@@ -343,10 +343,13 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
+
 __SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
     printk(KERN_INFO "Stopping monitor ... \n");
     spin_lock(&monitor.lock);
 
+    //IN TUTTE LE SYS CALL BISOGNA INSERIRE LA PASSWORD E CONTROLLARLA RISPETTO QUELLA SALVATA HASHATA
+    
     if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
@@ -445,6 +448,7 @@ __SYSCALL_DEFINEx(2, _insert_path, char __user *, path, char __user *, passwd){
     }
 
     //forse bisogna diminuire path
+    //DEVO ANCHE VERIFICARE CHE NON VENGA INSERITO PATH DEL SINGLE-FS
     if(monitor.last_index < MAX_LEN){
         for(int i = 0; i < monitor.last_index; i++){
             if(strncmp_custom(monitor.path[i], path, PATH) == 0){
@@ -513,6 +517,8 @@ __SYSCALL_DEFINEx(2, _set_password, char __user *, passwd, char __user *, new_pa
         return -1;
     } 
 
+    //LA PASSWORD VA CRITTOGRAFATA
+
     if(strncpy_from_user(monitor.password, new_passwd, PASS_LEN) < 0){
         printk(KERN_INFO "Failed to copy password from user space\n");
         spin_unlock(&monitor.lock);
@@ -526,7 +532,7 @@ __SYSCALL_DEFINEx(2, _set_password, char __user *, passwd, char __user *, new_pa
 
 static int __init monitor_init(void) {
 
-    // Modifica della system call table
+    // Modifica della system call table - necessito di 7 entry 
 
 
 
