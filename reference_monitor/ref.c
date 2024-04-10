@@ -14,6 +14,8 @@
 #include <linux/errno.h>
 #include <linux/file.h>
 #include <linux/string.h>
+#include <linux/syscalls.h>
+#include <utils/hash.h>
 
 #define PATH 512
 #define MAX_LEN 50
@@ -24,6 +26,7 @@ struct r_monitor {
     int last_index; //indice dell'ultimo path inserito
     int mode; //0 = OFF; 1 = ON; 2 = REC_OFF; 3 = REC_ON;
     char password[PASS_LEN];
+    int changed_pswd = 0; //se 0 è da controllare con "default" se 1 è da controllare con "new_password"
     spinlock_t lock;
 };
 
@@ -349,12 +352,26 @@ __SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
     spin_lock(&monitor.lock);
 
     //IN TUTTE LE SYS CALL BISOGNA INSERIRE LA PASSWORD E CONTROLLARLA RISPETTO QUELLA SALVATA HASHATA
+
+    if(monitor.changed_pswd == 0) {
+        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+            printk(KERN_INFO "ERROR default passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    } else {
+        if(compare_hash(passwd, monitor.password) != 0){
+            printk(KERN_INFO "ERROR new passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    }
     
-    if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
+    /*if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
         return -1;
-    } 
+    } */
     monitor.mode = 0;
     disable_kprobe(&kp_openat2);
     disable_kprobe(&kp_filp_open);
@@ -371,11 +388,25 @@ __SYSCALL_DEFINEx(1, _monitor_ON, char __user *, passwd){
     printk(KERN_INFO "Starting monitor ... \n");
     spin_lock(&monitor.lock);
 
-    if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
+    if(monitor.changed_pswd == 0) {
+        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+            printk(KERN_INFO "ERROR default passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    } else {
+        if(compare_hash(passwd, monitor.password) != 0){
+            printk(KERN_INFO "ERROR new passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    }
+
+    /*if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
         return -1;
-    } 
+    } */
     monitor.mode = 1;
     enable_kprobe(&kp_openat2);
     enable_kprobe(&kp_filp_open);
@@ -393,11 +424,25 @@ __SYSCALL_DEFINEx(1, _monitor_REC_OFF, char __user *, passwd){
     printk(KERN_INFO "Starting monitor reconfiguration REC_OFF ... \n");
     spin_lock(&monitor.lock);
 
-    if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
+    if(monitor.changed_pswd == 0) {
+        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+            printk(KERN_INFO "ERROR default passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    } else {
+        if(compare_hash(passwd, monitor.password) != 0){
+            printk(KERN_INFO "ERROR new passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    }
+
+    /*if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
         return -1;
-    } 
+    } */
     monitor.mode = 2;
     disable_kprobe(&kp_openat2);
     disable_kprobe(&kp_filp_open);
@@ -414,11 +459,25 @@ __SYSCALL_DEFINEx(1, _monitor_REC_ON, char __user *, passwd){
     printk(KERN_INFO "Starting monitor reconfiguration REC_ON... \n");
     spin_lock(&monitor.lock);
 
-    if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
+    if(monitor.changed_pswd == 0) {
+        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+            printk(KERN_INFO "ERROR default passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    } else {
+        if(compare_hash(passwd, monitor.password) != 0){
+            printk(KERN_INFO "ERROR new passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    }
+
+    /*if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
         return -1;
-    } 
+    } */
     monitor.mode = 3;
     enable_kprobe(&kp_openat2);
     enable_kprobe(&kp_filp_open);
@@ -435,11 +494,25 @@ __SYSCALL_DEFINEx(2, _insert_path, char __user *, path, char __user *, passwd){
     printk(KERN_INFO "Inserting path ... \n");
     spin_lock(&monitor.lock);
 
-    if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
+    if(monitor.changed_pswd == 0) {
+        if(strncmp_custom(monitor.password, passwd, PASS_LEN) != 0){
+            printk(KERN_INFO "ERROR default passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    } else {
+        if(compare_hash(passwd, monitor.password) != 0){
+            printk(KERN_INFO "ERROR new passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    }
+
+    /*if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
         return -1;
-    } 
+    } */
 
     if(monitor.mode == 0 || monitor.mode == 1){
         printk(KERN_INFO "Monitor OFF or ON - not in REC mode\n");
@@ -475,14 +548,56 @@ __SYSCALL_DEFINEx(2, _insert_path, char __user *, path, char __user *, passwd){
 }
 
 __SYSCALL_DEFINEx(2, _remove_path, char __user *, path, char __user *, passwd){
+
+    size_t len = strlen(passwd);
+    char *str = kmalloc(len + 1, GFP_KERNEL);
+    size_t len_path = strlen(path);
+    char *str_path = kmalloc(len_path + 1, GFP_KERNEL);
+    int value;
+
+    if (str == NULL) {
+        return -ENOMEM;
+    }
+
+    if (str_path == NULL) {
+        return -ENOMEM;
+    }
+
+    value = copy_from_user(str, passwd, len);
+
+    if (value != 0) {
+        kfree(str);
+        return -EFAULT;
+    }
+
+    value = copy_from_user(str_path, path, len_path);
+    
+    if (value != 0) {
+        kfree(str_path);
+        return -EFAULT;
+    }
+
     printk(KERN_INFO "Removing path ... \n");
     spin_lock(&monitor.lock);
+    if(monitor.changed_pswd == 0) {
+        if(strncmp_custom(monitor.password, passwd, PASS_LEN) != 0){
+            printk(KERN_INFO "ERROR default passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    } else {
+        if(compare_hash(passwd, monitor.password) != 0){
+            printk(KERN_INFO "ERROR new passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    }
 
-    if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
+    /*if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
         return -1;
-    } 
+    } */
 
     if(monitor.mode == 0 || monitor.mode == 1){
         printk(KERN_INFO "Monitor OFF or ON - not in REC mode\n");
@@ -511,11 +626,25 @@ __SYSCALL_DEFINEx(2, _set_password, char __user *, passwd, char __user *, new_pa
     printk(KERN_INFO "Setting password ... \n");
     spin_lock(&monitor.lock);
 
-    if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
+    if(monitor.changed_pswd == 0) {
+        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+            printk(KERN_INFO "ERROR default passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    } else {
+        if(compare_hash(passwd, monitor.password) != 0){
+            printk(KERN_INFO "ERROR new passwd\n");
+            spin_unlock(&monitor.lock);
+            return -1;
+        }
+    }
+
+    /*if((strncmp_custom(monitor.password, passwd, PASS_LEN) != 0) || get_euid() != 0){
         printk(KERN_INFO "ERROR passwd or non root user\n");
         spin_unlock(&monitor.lock);
         return -1;
-    } 
+    } */
 
     //LA PASSWORD VA CRITTOGRAFATA
 

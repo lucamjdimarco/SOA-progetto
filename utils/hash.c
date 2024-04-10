@@ -53,7 +53,8 @@ int compare_hash(char __user *password, unsigned char *hash_passwd) {
     if (hash_password(str, hash) == 0) {
         // Hash calcolato con successo
         printk(KERN_INFO "Password hashed\n");
-        if(strncmp(hash, hash_passwd, SHA256_LENGTH) == 0) {
+        //prima usavo strncmp
+        if(memcmp(hash, hash_passwd, SHA256_LENGTH) == 0) {
             // Password corretta
             printk(KERN_INFO "Password correct\n");
         } else {
@@ -72,3 +73,4 @@ int compare_hash(char __user *password, unsigned char *hash_passwd) {
 
     return 0;
 }
+
