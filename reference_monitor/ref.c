@@ -20,6 +20,7 @@
 #define PATH 512
 #define MAX_LEN 50
 #define PASS_LEN 20
+#define SHA256_LENGTH 32
 
 struct r_monitor {
     char *path[MAX_LEN]; //array di puntatori ai path da proteggere
@@ -349,18 +350,33 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
 
 __SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
     printk(KERN_INFO "Stopping monitor ... \n");
+
+    int ret;
+    size_t len = strlen(passwd);
+    char *str = kmalloc(len + 1, GFP_KERNEL);
+    if (str == NULL) {
+        return -ENOMEM;
+    }
+    
+    ret = strncpy_from_user(str, passwd, len);
+    if (ret != 0) {
+        kfree(str);
+        return -EFAULT;
+    }
+
+
     spin_lock(&monitor.lock);
 
     //IN TUTTE LE SYS CALL BISOGNA INSERIRE LA PASSWORD E CONTROLLARLA RISPETTO QUELLA SALVATA HASHATA
 
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+        if(strncmp_custom(monitor.password, str, len) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(passwd, monitor.password) != 0){
+        if(compare_hash(str, monitor.password) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -386,16 +402,30 @@ __SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
 
 __SYSCALL_DEFINEx(1, _monitor_ON, char __user *, passwd){
     printk(KERN_INFO "Starting monitor ... \n");
+
+    int ret;
+    size_t len = strlen(passwd);
+    char *str = kmalloc(len + 1, GFP_KERNEL);
+    if (str == NULL) {
+        return -ENOMEM;
+    }
+    
+    ret = strncpy_from_user(str, passwd, len);
+    if (ret != 0) {
+        kfree(str);
+        return -EFAULT;
+    }
+
     spin_lock(&monitor.lock);
 
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+        if(strncmp_custom(monitor.password, str, len) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(passwd, monitor.password) != 0){
+        if(compare_hash(str, monitor.password) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -422,16 +452,30 @@ __SYSCALL_DEFINEx(1, _monitor_ON, char __user *, passwd){
 
 __SYSCALL_DEFINEx(1, _monitor_REC_OFF, char __user *, passwd){
     printk(KERN_INFO "Starting monitor reconfiguration REC_OFF ... \n");
+
+    int ret;
+    size_t len = strlen(passwd);
+    char *str = kmalloc(len + 1, GFP_KERNEL);
+    if (str == NULL) {
+        return -ENOMEM;
+    }
+    
+    ret = strncpy_from_user(str, passwd, len);
+    if (ret != 0) {
+        kfree(str);
+        return -EFAULT;
+    }
+
     spin_lock(&monitor.lock);
 
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+        if(strncmp_custom(monitor.password, str, len) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(passwd, monitor.password) != 0){
+        if(compare_hash(passwd, monitor.password) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -457,16 +501,30 @@ __SYSCALL_DEFINEx(1, _monitor_REC_OFF, char __user *, passwd){
 
 __SYSCALL_DEFINEx(1, _monitor_REC_ON, char __user *, passwd){
     printk(KERN_INFO "Starting monitor reconfiguration REC_ON... \n");
+
+    int ret;
+    size_t len = strlen(passwd);
+    char *str = kmalloc(len + 1, GFP_KERNEL);
+    if (str == NULL) {
+        return -ENOMEM;
+    }
+    
+    ret = strncpy_from_user(str, passwd, len);
+    if (ret != 0) {
+        kfree(str);
+        return -EFAULT;
+    }
+
     spin_lock(&monitor.lock);
 
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+        if(strncmp_custom(monitor.password, str, len) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(passwd, monitor.password) != 0){
+        if(compare_hash(str, monitor.password) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -492,16 +550,40 @@ __SYSCALL_DEFINEx(1, _monitor_REC_ON, char __user *, passwd){
 
 __SYSCALL_DEFINEx(2, _insert_path, char __user *, path, char __user *, passwd){
     printk(KERN_INFO "Inserting path ... \n");
+
+    int ret;
+    size_t len_path = strlen(path);
+    char *str_path = kmalloc(len_path + 1, GFP_KERNEL);
+    if (str_path == NULL) {
+        return -ENOMEM;
+    }
+    ret = strncpy_from_user(str_path, path, len_path);
+    if (ret != 0) {
+        kfree(str_path);
+        return -EFAULT;
+    }
+
+    size_t len_pas = strlen(passwd);
+    char *str_pass = kmalloc(len_pas + 1, GFP_KERNEL);
+    if (str_pass == NULL) {
+        return -ENOMEM;
+    }
+    ret = strncpy_from_user(str_pass, passwd, len_pas);
+    if (ret != 0) {
+        kfree(str_pass);
+        return -EFAULT;
+    }
+
     spin_lock(&monitor.lock);
 
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, passwd, PASS_LEN) != 0){
+        if(strncmp_custom(monitor.password, str_pass, len_pas) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(passwd, monitor.password) != 0){
+        if(compare_hash(str_pass, monitor.password) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -524,13 +606,13 @@ __SYSCALL_DEFINEx(2, _insert_path, char __user *, path, char __user *, passwd){
     //DEVO ANCHE VERIFICARE CHE NON VENGA INSERITO PATH DEL SINGLE-FS
     if(monitor.last_index < MAX_LEN){
         for(int i = 0; i < monitor.last_index; i++){
-            if(strncmp_custom(monitor.path[i], path, PATH) == 0){
+            if(strncmp_custom(monitor.path[i], str_path, len_path) == 0){
                 printk(KERN_INFO "Path already inserted\n");
                 spin_unlock(&monitor.lock);
                 return -1;
             }
         }
-        if(strncpy_from_user(monitor.path[monitor.last_index], path, PATH) < 0){
+        if(strncpy_from_user(monitor.path[monitor.last_index], path, len_path) < 0){
             printk(KERN_INFO "Failed to copy path from user space\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -563,14 +645,14 @@ __SYSCALL_DEFINEx(2, _remove_path, char __user *, path, char __user *, passwd){
         return -ENOMEM;
     }
 
-    value = copy_from_user(str, passwd, len);
+    value = strncpy_from_user(str, passwd, len);
 
     if (value != 0) {
         kfree(str);
         return -EFAULT;
     }
 
-    value = copy_from_user(str_path, path, len_path);
+    value = strncpy_from_user(str_path, path, len_path);
     
     if (value != 0) {
         kfree(str_path);
@@ -580,13 +662,13 @@ __SYSCALL_DEFINEx(2, _remove_path, char __user *, path, char __user *, passwd){
     printk(KERN_INFO "Removing path ... \n");
     spin_lock(&monitor.lock);
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, passwd, PASS_LEN) != 0){
+        if(strncmp_custom(monitor.password, str, PASS_LEN) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(passwd, monitor.password) != 0){
+        if(compare_hash(str, monitor.password) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -606,7 +688,7 @@ __SYSCALL_DEFINEx(2, _remove_path, char __user *, path, char __user *, passwd){
     }
 
     for(int i = 0; i < monitor.last_index; i++){
-        if(strncmp_custom(monitor.path[i], path, PATH) == 0){
+        if(strncmp_custom(monitor.path[i], str_path, PATH) == 0){
             for(int j = i; j < monitor.last_index - 1; j++){
                 monitor.path[j] = monitor.path[j+1];
             }
@@ -624,16 +706,31 @@ __SYSCALL_DEFINEx(2, _remove_path, char __user *, path, char __user *, passwd){
 
 __SYSCALL_DEFINEx(2, _set_password, char __user *, passwd, char __user *, new_passwd){
     printk(KERN_INFO "Setting password ... \n");
+
+    int ret;
+    size_t len_pas = strlen(passwd);
+    size_t len_new_pas = strlen(new_passwd);
+    char *str = kmalloc(len_pas + 1, GFP_KERNEL);
+    if (str == NULL) {
+        return -ENOMEM;
+    }
+    
+    ret = strncpy_from_user(str, passwd, len_pas);
+    if (ret != 0) {
+        kfree(str);
+        return -EFAULT;
+    }
+
     spin_lock(&monitor.lock);
 
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, "default", PASS_LEN) != 0){
+        if(strncmp_custom(monitor.password, str, len_pas) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(passwd, monitor.password) != 0){
+        if(compare_hash(str, monitor.password) != 0 || getuid() != 0){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -646,13 +743,35 @@ __SYSCALL_DEFINEx(2, _set_password, char __user *, passwd, char __user *, new_pa
         return -1;
     } */
 
-    //LA PASSWORD VA CRITTOGRAFATA
-
-    if(strncpy_from_user(monitor.password, new_passwd, PASS_LEN) < 0){
-        printk(KERN_INFO "Failed to copy password from user space\n");
+    unsigned char hash_passwd[SHA256_LENGTH];
+    char *new_pas = kmalloc(len_new_pas + 1, GFP_KERNEL);
+    if (new_pas == NULL) {
+        return -ENOMEM;
+    }
+    ret = strncpy_from_user(new_pas, new_passwd, len_new_pas);
+    if (ret != 0) {
+        kfree(new_pas);
+        return -EFAULT;
+    }
+    if(hash_password(new_pas, hash_passwd) != 0){
+        printk(KERN_INFO "Failed to hash password\n");
         spin_unlock(&monitor.lock);
         return -1;
     }
+
+    /* posso usare la strcnpy in questo modo???????*/
+
+    if(strncpy(monitor.password, new_pas, len_new_pas) == NULL){
+        printk(KERN_INFO "Failed to copy password\n");
+        spin_unlock(&monitor.lock);
+        return -1;
+    }
+
+    /*if(strncpy_from_user(monitor.password, new_passwd, PASS_LEN) < 0){
+        printk(KERN_INFO "Failed to copy password from user space\n");
+        spin_unlock(&monitor.lock);
+        return -1;
+    }*/
 
     spin_unlock(&monitor.lock);
     printk(KERN_INFO "Password set\n");
