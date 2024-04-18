@@ -2,8 +2,14 @@
 #include <linux/scatterlist.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <crypto/hash.h>
+#include <linux/module.h>
 
 #define SHA256_LENGTH 32
+
+MODULE_AUTHOR("Luca Di Marco");
+MODULE_DESCRIPTION("Aux function for the reference monitor");
+MODULE_LICENSE("GPL");
 
 int hash_password(const char *plaintext, unsigned char *output) {
     struct crypto_shash *sha256;
@@ -23,7 +29,7 @@ int hash_password(const char *plaintext, unsigned char *output) {
     }
 
     shash->tfm = sha256;
-    shash->flags = 0x0;
+    //shash->flags = 0x0;
 
     ret = crypto_shash_digest(shash, plaintext, strlen(plaintext), output);
     kfree(shash);
