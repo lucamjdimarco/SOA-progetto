@@ -2,6 +2,10 @@
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "typeinfo": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "hash.h": "c",
+        "module.h": "c",
+        "func_aux.h": "c",
+        "errno.h": "c"
     }
 }
