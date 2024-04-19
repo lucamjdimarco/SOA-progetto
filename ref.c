@@ -15,8 +15,8 @@
 #include <linux/file.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
-#include <utils/hash.h>
-#include <utils/func_aux.h>
+#include "utils/hash.h"
+#include "utils/func_aux.h"
 
 #define PATH 512
 #define MAX_LEN 50
@@ -28,11 +28,12 @@ struct r_monitor {
     int last_index; //indice dell'ultimo path inserito
     int mode; //0 = OFF; 1 = ON; 2 = REC_OFF; 3 = REC_ON;
     char password[PASS_LEN];
-    int changed_pswd = 0; //se 0 è da controllare con "default" se 1 è da controllare con "new_password"
+    int changed_pswd; //se 0 è da controllare con "default" se 1 è da controllare con "new_password"
     spinlock_t lock;
 };
 
 struct r_monitor monitor;
+
 
 unsigned long syscall_table_address = 0x0;
 
@@ -697,7 +698,7 @@ static int __init monitor_init(void) {
 
     // Modifica della system call table - necessito di 7 entry 
 
-
+    monitor.changed_pswd = 0;
 
     kp_openat2.pre_handler = handler_openat2;
     kp_openat2.symbol_name = "do_sys_openat2"; // Nome della funzione da intercettare
