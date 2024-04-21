@@ -12,6 +12,12 @@ the_ref-objs := utils/hash.o utils/func_aux.o ref.o
 
 all:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+	
+mount:
+	insmod the_ref.ko syscall_table_address=$(shell cat /sys/module/the_usctm/parameters/sys_call_table_address) entry1=$(shell cat /sys/module/the_usctm/parameters/free_entries | cut -d ',' -f2) entry2=$(shell cat /sys/module/the_usctm/parameters/free_entries | cut -d ',' -f3) entry3=$(shell cat /sys/module/the_usctm/parameters/free_entries | cut -d ',' -f4) entry4=$(shell cat /sys/module/the_usctm/parameters/free_entries | cut -d ',' -f5) entry5=$(shell cat /sys/module/the_usctm/parameters/free_entries | cut -d ',' -f6) entry6=$(shell cat /sys/module/the_usctm/parameters/free_entries | cut -d ',' -f7) entry7=$(shell cat /sys/module/the_usctm/parameters/free_entries | cut -d ',' -f8)
 
 clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
+
+unmount:
+	rmmod the_ref.ko
