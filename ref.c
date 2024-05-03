@@ -15,6 +15,7 @@
 #include <linux/file.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
+#include <linux/version.h>
 #include "utils/hash.h"
 #include "utils/func_aux.h"
 
@@ -66,6 +67,39 @@ struct open_flags {
 	int acc_mode;
 	int intent;
 };
+
+static inline bool is_root_uid(void) {
+    #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+        #include "linux/uidgid.h"
+            // current_uid() returns struct in newer kernels
+            return uid_eq(current_uid(), GLOBAL_ROOT_UID);
+        #else
+            return 0 == current_uid();
+    #endif
+}
+
+unsigned long cr0;
+
+static inline void write_cr0_forced(unsigned long val)
+{
+    unsigned long __force_order;
+
+    /* __asm__ __volatile__( */
+    asm volatile(
+        "mov %0, %%cr0"
+        : "+r"(val), "+m"(__force_order));
+}
+
+static inline void protect_memory(void)
+{
+    write_cr0_forced(cr0);
+}
+
+static inline void unprotect_memory(void)
+{
+    write_cr0_forced(cr0 & ~X86_CR0_WP);
+}
+
 
 static int handler_openat2(struct kprobe *p, struct pt_regs *regs) {
     char path[PATH];
@@ -334,19 +368,16 @@ __SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
         return -EFAULT;
     }
 
-
     spin_lock(&monitor.lock);
 
-    //IN TUTTE LE SYS CALL BISOGNA INSERIRE LA PASSWORD E CONTROLLARLA RISPETTO QUELLA SALVATA HASHATA
-
     if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str, len) != 0 || get_euid() != 0){
+        if(strncmp_custom(monitor.password, str, len) != 0 || is_root_uid()){
             printk(KERN_INFO "ERROR default passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
         }
     } else {
-        if(compare_hash(str, monitor.password) != 0 || get_euid() != 0){
+        if(compare_hash(str, monitor.password) != 0 || is_root_uid()){
             printk(KERN_INFO "ERROR new passwd\n");
             spin_unlock(&monitor.lock);
             return -1;
@@ -729,10 +760,20 @@ static int __init monitor_init(void) {
     printk(KERN_INFO "entry1: %d\n", entry1);
     printk(KERN_INFO "entry2: %d\n", entry2);
     printk(KERN_INFO "entry3: %d\n", entry3);
-    printk(KERN_INFO "entry4: %d\n", entry4);
+    printk(KERN_INFO "entry4: %d\n", entry4);   
     printk(KERN_INFO "entry5: %d\n", entry5);
     printk(KERN_INFO "entry6: %d\n", entry6);
     printk(KERN_INFO "entry7: %d\n", entry7);
+
+    /* ERRORE DI SEGMENTAZIONE */
+
+    unprotect_memory();
+
+    ((unsigned long *)syscall_table_address)[entry1] = (unsigned long)__x64_sys_monitor_OFF;
+
+    protect_memory();
+
+    /* ERRORE DI SEGMENTAZIONE */
 
     kp_openat2.pre_handler = handler_openat2;
     kp_openat2.symbol_name = "do_sys_openat2"; // Nome della funzione da intercettare

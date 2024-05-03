@@ -15,6 +15,8 @@
 #include <linux/file.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>
+#include <linux/version.h>
+#include <linux/cred.h>
 
 MODULE_AUTHOR("Luca Di Marco");
 MODULE_DESCRIPTION("Aux function for the reference monitor");
@@ -62,3 +64,13 @@ out:
     kfree(tpath);
     return NULL;
 }
+
+/*static inline bool is_root_uid(void) {
+    #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+        #include "linux/uidgid.h"
+            // current_uid() returns struct in newer kernels
+            return uid_eq(current_uid(), GLOBAL_ROOT_UID);
+        #else
+            return 0 == current_uid();
+    #endif
+}*/
