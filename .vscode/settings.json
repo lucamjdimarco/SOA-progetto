@@ -7,6 +7,7 @@
         "module.h": "c",
         "func_aux.h": "c",
         "errno.h": "c",
-        "spinlock.h": "c"
+        "spinlock.h": "c",
+        "version.h": "c"
     }
 }

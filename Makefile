@@ -28,5 +28,5 @@ clean:
 	$(MAKE) -C $(KERNELDIR) M=$(PWD) clean
 
 unmount:
-	rmmod the_usctm.ko
+	#rmmod the_usctm.ko
 	rmmod the_ref.ko

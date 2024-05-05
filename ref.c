@@ -333,8 +333,14 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
+#define SYS_CALL_INSTALL
 
+#ifdef SYS_CALL_INSTALL
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
 __SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
+#else
+asmlinkage long sys_monitor_OFF(char __user *passwd) {
+#endif
     printk(KERN_INFO "Stopping monitor ... \n");
 
     int ret;
@@ -377,6 +383,9 @@ __SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
     printk(KERN_INFO "Monitor OFF\n");
     return 0;
 }
+
+#else
+#endif
 
 /*
 __SYSCALL_DEFINEx(1, _monitor_ON, char __user *, passwd){
@@ -720,6 +729,11 @@ __SYSCALL_DEFINEx(2, _set_password, char __user *, passwd, char __user *, new_pa
     return 0;
 } */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
+static unsigned long sys_monitor_OFF = (unsigned long) __x64_sys_monitor_OFF;	
+#else
+#endif
+
 static int __init monitor_init(void) {
 
     // Modifica della system call table - necessito di 7 entry 
@@ -751,16 +765,23 @@ static int __init monitor_init(void) {
 
     ret = get_entries(entries_syscall_table, TABLE_ENTRIES,(unsigned long *)syscall_table_address, &the_ny_syscall);
 
+    printk(KERN_INFO "ENTRIES %d\n", ret);
+
     if (ret != TABLE_ENTRIES) {
         printk(KERN_INFO "Failed to get entries from the sys-call table\n");
         return -1;
     }
+    
+    #ifdef SYS_CALL_INSTALL 
 
     unprotect_memory();
 
-    ((unsigned long *)syscall_table_address)[entries_syscall_table[0]] = (unsigned long)__x64_sys_monitor_OFF;
+    ((unsigned long *)syscall_table_address)[entries_syscall_table[0]] = (unsigned long)sys_monitor_OFF;
 
     protect_memory();
+    
+    #else
+    #endif
 
 
     kp_openat2.pre_handler = handler_openat2;
@@ -809,6 +830,8 @@ static int __init monitor_init(void) {
 
 static void __exit monitor_exit(void) {
 
+    #ifdef SYS_CALL_INSTALL 
+
     unprotect_memory();
 
     ((unsigned long *)syscall_table_address)[entries_syscall_table[0]] = the_ny_syscall;
@@ -816,6 +839,9 @@ static void __exit monitor_exit(void) {
     //((unsigned long *)syscall_table_address)[174] = the_ny_syscall;
 
     protect_memory();
+    
+    #else
+    #endif
 
     unregister_kprobe(&kp_openat2);
     unregister_kprobe(&kp_filp_open);
