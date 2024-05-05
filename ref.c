@@ -18,11 +18,13 @@
 #include <linux/version.h>
 #include "utils/hash.h"
 #include "utils/func_aux.h"
+#include "utils/scth.h"
 
 #define PATH 512
 #define MAX_LEN 50
 #define PASS_LEN 20
 #define SHA256_LENGTH 32
+#define TABLE_ENTRIES 7
 
 struct r_monitor {
     char *path[MAX_LEN]; //array di puntatori ai path da proteggere
@@ -37,23 +39,25 @@ struct r_monitor monitor;
 
 
 unsigned long syscall_table_address = 0x0;
-static int entry1;
+/*static int entry1;
 static int entry2;
 static int entry3;
 static int entry4;
 static int entry5;
 static int entry6;
-static int entry7;
+static int entry7;*/
 
-module_param(entry1, int, 0660);
+/*module_param(entry1, int, 0660);
 module_param(entry2, int, 0660);
 module_param(entry3, int, 0660);
 module_param(entry4, int, 0660);
 module_param(entry5, int, 0660);
 module_param(entry6, int, 0660);
-module_param(entry7, int, 0660);
+module_param(entry7, int, 0660);*/
 module_param(syscall_table_address, ulong, 0660);
 
+int entries_syscall_table[TABLE_ENTRIES];
+unsigned long the_ny_syscall;
 
 static struct kprobe kp_openat2;
 static struct kprobe kp_filp_open;
@@ -76,28 +80,6 @@ static inline bool is_root_uid(void) {
         #else
             return 0 == current_uid();
     #endif
-}
-
-unsigned long cr0;
-
-static inline void write_cr0_forced(unsigned long val)
-{
-    unsigned long __force_order;
-
-    /* __asm__ __volatile__( */
-    asm volatile(
-        "mov %0, %%cr0"
-        : "+r"(val), "+m"(__force_order));
-}
-
-static inline void protect_memory(void)
-{
-    write_cr0_forced(cr0);
-}
-
-static inline void unprotect_memory(void)
-{
-    write_cr0_forced(cr0 & ~X86_CR0_WP);
 }
 
 
@@ -751,29 +733,35 @@ static int __init monitor_init(void) {
         return -1;
     }
 
-    if (entry1 == 0 || entry2 == 0 || entry3 == 0 || entry4 == 0 || entry5 == 0 || entry6 == 0 || entry7 == 0) {
+    /*if (entry1 == 0 || entry2 == 0 || entry3 == 0 || entry4 == 0 || entry5 == 0 || entry6 == 0 || entry7 == 0) {
         printk(KERN_INFO "entry not set\n");
         return -1;
-    }
+    }*/
 
     printk(KERN_INFO "syscall_table_address: %lx\n", syscall_table_address);
-    printk(KERN_INFO "entry1: %d\n", entry1);
+    /*printk(KERN_INFO "entry1: %d\n", entry1);
     printk(KERN_INFO "entry2: %d\n", entry2);
     printk(KERN_INFO "entry3: %d\n", entry3);
     printk(KERN_INFO "entry4: %d\n", entry4);   
     printk(KERN_INFO "entry5: %d\n", entry5);
     printk(KERN_INFO "entry6: %d\n", entry6);
-    printk(KERN_INFO "entry7: %d\n", entry7);
+    printk(KERN_INFO "entry7: %d\n", entry7);*/
 
-    /* ERRORE DI SEGMENTAZIONE */
+    int ret;
+
+    ret = get_entries(entries_syscall_table, TABLE_ENTRIES,(unsigned long *)syscall_table_address, &the_ny_syscall);
+
+    if (ret != TABLE_ENTRIES) {
+        printk(KERN_INFO "Failed to get entries from the sys-call table\n");
+        return -1;
+    }
 
     unprotect_memory();
 
-    ((unsigned long *)syscall_table_address)[entry1] = (unsigned long)__x64_sys_monitor_OFF;
+    ((unsigned long *)syscall_table_address)[entries_syscall_table[0]] = (unsigned long)__x64_sys_monitor_OFF;
 
     protect_memory();
 
-    /* ERRORE DI SEGMENTAZIONE */
 
     kp_openat2.pre_handler = handler_openat2;
     kp_openat2.symbol_name = "do_sys_openat2"; // Nome della funzione da intercettare
@@ -820,6 +808,15 @@ static int __init monitor_init(void) {
 }
 
 static void __exit monitor_exit(void) {
+
+    unprotect_memory();
+
+    ((unsigned long *)syscall_table_address)[entries_syscall_table[0]] = the_ny_syscall;
+    //((unsigned long *)syscall_table_address)[156] = the_ny_syscall;
+    //((unsigned long *)syscall_table_address)[174] = the_ny_syscall;
+
+    protect_memory();
+
     unregister_kprobe(&kp_openat2);
     unregister_kprobe(&kp_filp_open);
     unregister_kprobe(&kp_rmdir);
