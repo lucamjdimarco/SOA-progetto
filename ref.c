@@ -35,7 +35,10 @@ struct r_monitor {
     spinlock_t lock;
 };
 
-struct r_monitor monitor;
+struct r_monitor monitor = {
+    .password = "default",
+    .changed_pswd = 0
+};
 
 
 unsigned long syscall_table_address = 0x0;
@@ -740,7 +743,7 @@ static int __init monitor_init(void) {
 
     printk(KERN_INFO "Monitor module loaded\n");
 
-    monitor.changed_pswd = 0;
+    //monitor.changed_pswd = 0;
 
     if (syscall_table_address == 0x0) {
         printk(KERN_INFO "syscall_table_address not set\n");

@@ -8,6 +8,7 @@
         "func_aux.h": "c",
         "errno.h": "c",
         "spinlock.h": "c",
-        "version.h": "c"
+        "version.h": "c",
+        "types.h": "c"
     }
 }
