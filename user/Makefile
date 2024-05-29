@@ -1,2 +1,2 @@
 all:
-	gcc user.c call.c -o user
+	gcc user.c -o user

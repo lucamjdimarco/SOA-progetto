@@ -9,6 +9,7 @@
         "errno.h": "c",
         "spinlock.h": "c",
         "version.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "stdio.h": "c"
     }
 }

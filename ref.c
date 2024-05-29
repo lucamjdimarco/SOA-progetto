@@ -18,13 +18,16 @@
 #include <linux/version.h>
 #include "utils/hash.h"
 #include "utils/func_aux.h"
-#include "utils/scth.h"
 
 #define PATH 512
 #define MAX_LEN 50
 #define PASS_LEN 20
 #define SHA256_LENGTH 32
 #define TABLE_ENTRIES 7
+
+#define DEVICE_NAME "/dev/ref_monitor"
+
+static int Major;
 
 struct r_monitor {
     char *path[MAX_LEN]; //array di puntatori ai path da proteggere
@@ -39,28 +42,6 @@ struct r_monitor monitor = {
     .password = "default",
     .changed_pswd = 0
 };
-
-
-unsigned long syscall_table_address = 0x0;
-/*static int entry1;
-static int entry2;
-static int entry3;
-static int entry4;
-static int entry5;
-static int entry6;
-static int entry7;*/
-
-/*module_param(entry1, int, 0660);
-module_param(entry2, int, 0660);
-module_param(entry3, int, 0660);
-module_param(entry4, int, 0660);
-module_param(entry5, int, 0660);
-module_param(entry6, int, 0660);
-module_param(entry7, int, 0660);*/
-module_param(syscall_table_address, ulong, 0660);
-
-int entries_syscall_table[TABLE_ENTRIES];
-unsigned long the_ny_syscall;
 
 static struct kprobe kp_openat2;
 static struct kprobe kp_filp_open;
@@ -336,455 +317,91 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-#define SYS_CALL_INSTALL
-
-#ifdef SYS_CALL_INSTALL
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
-__SYSCALL_DEFINEx(1, _monitor_OFF, char __user *, passwd){
-#else
-asmlinkage long sys_monitor_OFF(char __user *passwd) {
-#endif
-    printk(KERN_INFO "Stopping monitor ... \n");
-
-    int ret;
-    size_t len = strnlen_user(passwd, PASS_LEN);
-    char *str = kmalloc(len + 1, GFP_KERNEL);
-    if (str == NULL) {
-        return -ENOMEM;
-    }
-    
-    ret = strncpy_from_user(str, passwd, len);
-    if (ret != 0) {
-        kfree(str);
-        return -EFAULT;
-    }
-
+int setMonitorON() {
+    printk(KERN_INFO "Monitor is now ON\n");
     spin_lock(&monitor.lock);
-
-    if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str, len) != 0 || is_root_uid()){
-            printk(KERN_INFO "ERROR default passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    } else {
-        if(compare_hash(str, monitor.password) != 0 || is_root_uid()){
-            printk(KERN_INFO "ERROR new passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    }
-    
-    monitor.mode = 0;
-    disable_kprobe(&kp_openat2);
-    disable_kprobe(&kp_filp_open);
-    disable_kprobe(&kp_rmdir);
-    disable_kprobe(&kp_mkdir_at);
-    disable_kprobe(&kp_unlinkat);
-
-    spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Monitor OFF\n");
-    return 0;
-}
-
-#else
-#endif
-
-/*
-__SYSCALL_DEFINEx(1, _monitor_ON, char __user *, passwd){
-    printk(KERN_INFO "Starting monitor ... \n");
-
-    int ret;
-    size_t len = strnlen_user(passwd);
-    char *str = kmalloc(len + 1, GFP_KERNEL);
-    if (str == NULL) {
-        return -ENOMEM;
-    }
-    
-    ret = strncpy_from_user(str, passwd, len);
-    if (ret != 0) {
-        kfree(str);
-        return -EFAULT;
-    }
-
-    spin_lock(&monitor.lock);
-
-    if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str, len) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR default passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    } else {
-        if(compare_hash(str, monitor.password) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR new passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    }
-
     monitor.mode = 1;
-    enable_kprobe(&kp_openat2);
-    enable_kprobe(&kp_filp_open);
-    enable_kprobe(&kp_rmdir);
-    enable_kprobe(&kp_mkdir_at);
-    enable_kprobe(&kp_unlinkat);
-
     spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Monitor ON\n");
     return 0;
 }
 
-
-__SYSCALL_DEFINEx(1, _monitor_REC_OFF, char __user *, passwd){
-    printk(KERN_INFO "Starting monitor reconfiguration REC_OFF ... \n");
-
-    int ret;
-    size_t len = strnlen_user(passwd);
-    char *str = kmalloc(len + 1, GFP_KERNEL);
-    if (str == NULL) {
-        return -ENOMEM;
-    }
-    
-    ret = strncpy_from_user(str, passwd, len);
-    if (ret != 0) {
-        kfree(str);
-        return -EFAULT;
-    }
-
+int setMonitorOFF() {
+    printk(KERN_INFO "Monitor is now OFF\n");
     spin_lock(&monitor.lock);
-
-    if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str, len) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR default passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    } else {
-        if(compare_hash(passwd, monitor.password) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR new passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    }
-
-    monitor.mode = 2;
-    disable_kprobe(&kp_openat2);
-    disable_kprobe(&kp_filp_open);
-    disable_kprobe(&kp_rmdir);
-    disable_kprobe(&kp_mkdir_at);
-    disable_kprobe(&kp_unlinkat);
-
+    monitor.mode = 0;
     spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Monitor REC_OFF\n");
     return 0;
 }
 
-__SYSCALL_DEFINEx(1, _monitor_REC_ON, char __user *, passwd){
-    printk(KERN_INFO "Starting monitor reconfiguration REC_ON... \n");
-
-    int ret;
-    size_t len = strnlen_user(passwd);
-    char *str = kmalloc(len + 1, GFP_KERNEL);
-    if (str == NULL) {
-        return -ENOMEM;
-    }
-    
-    ret = strncpy_from_user(str, passwd, len);
-    if (ret != 0) {
-        kfree(str);
-        return -EFAULT;
-    }
-
+int setMonitorREC_ON() {
+    printk(KERN_INFO "Monitor is now REC_ON\n");
     spin_lock(&monitor.lock);
-
-    if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str, len) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR default passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    } else {
-        if(compare_hash(str, monitor.password) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR new passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    }
-
     monitor.mode = 3;
-    enable_kprobe(&kp_openat2);
-    enable_kprobe(&kp_filp_open);
-    enable_kprobe(&kp_rmdir);
-    enable_kprobe(&kp_mkdir_at);
-    enable_kprobe(&kp_unlinkat);
-
     spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Monitor REC_ON\n");
     return 0;
 }
 
-__SYSCALL_DEFINEx(2, _insert_path, char __user *, path, char __user *, passwd){
-    printk(KERN_INFO "Inserting path ... \n");
+int setMonitorREC_OFF() {
+    printk(KERN_INFO "Monitor is now REC_OFF\n");
+    spin_lock(&monitor.lock);
+    monitor.mode = 2;
+    spin_unlock(&monitor.lock);
+    return 0;
+}
 
+
+static int ref_open(struct inode *inode, struct file *file) {
+    printk(KERN_INFO "Open\n");
+    return 0;
+}
+
+static ssize_t ref_write(struct file *f, const char *buff, size_t len, loff_t *off) {
+
+    char *buffer = kmalloc(1024, GFP_KERNEL);
     int ret;
-    size_t len_path = strnlen_user(path);
-    char *str_path = kmalloc(len_path + 1, GFP_KERNEL);
-    if (str_path == NULL) {
-        return -ENOMEM;
+
+    if (!buffer) {
+	    printk(KERN_ERR "Error on allocating memory\n");
+	    return -ENOMEM;
+	}
+
+    if(len > 1024) {
+        printk(KERN_ERR "Error: too data\n");
+        return -EINVAL;
     }
-    ret = strncpy_from_user(str_path, path, len_path);
-    if (ret != 0) {
-        kfree(str_path);
+
+    ret = copy_from_user(buffer, buff, len);
+
+    if (ret) {
+        printk(KERN_ERR "Error on copy_from_user\n");
         return -EFAULT;
     }
 
-    size_t len_pas = strnlen_user(passwd);
-    char *str_pass = kmalloc(len_pas + 1, GFP_KERNEL);
-    if (str_pass == NULL) {
-        return -ENOMEM;
-    }
-    ret = strncpy_from_user(str_pass, passwd, len_pas);
-    if (ret != 0) {
-        kfree(str_pass);
-        return -EFAULT;
-    }
+    printk(KERN_INFO "Received: %s\n", buffer);
 
-    spin_lock(&monitor.lock);
-
-    if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str_pass, len_pas) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR default passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    } else {
-        if(compare_hash(str_pass, monitor.password) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR new passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    }
-
-    if(monitor.mode == 0 || monitor.mode == 1){
-        printk(KERN_INFO "Monitor OFF or ON - not in REC mode\n");
-        spin_unlock(&monitor.lock);
-        return -1;
-    }
-
-    //forse bisogna diminuire path
-    //DEVO ANCHE VERIFICARE CHE NON VENGA INSERITO PATH DEL SINGLE-FS
-    if(monitor.last_index < MAX_LEN){
-        for(int i = 0; i < monitor.last_index; i++){
-            if(strncmp_custom(monitor.path[i], str_path, len_path) == 0){
-                printk(KERN_INFO "Path already inserted\n");
-                spin_unlock(&monitor.lock);
-                return -1;
-            }
-        }
-        if(strncpy_from_user(monitor.path[monitor.last_index], path, len_path) < 0){
-            printk(KERN_INFO "Failed to copy path from user space\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-        monitor.last_index++;
-    } else {
-        printk(KERN_INFO "Max number of paths reached\n");
-        spin_unlock(&monitor.lock);
-        return -1;
-    }
-
-    spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Path inserted\n");
-    return 0;
 }
 
-__SYSCALL_DEFINEx(2, _remove_path, char __user *, path, char __user *, passwd){
-
-    size_t len = strnlen_user(passwd);
-    char *str = kmalloc(len + 1, GFP_KERNEL);
-    size_t len_path = strnlen_user(path);
-    char *str_path = kmalloc(len_path + 1, GFP_KERNEL);
-    int value;
-
-    if (str == NULL) {
-        return -ENOMEM;
-    }
-
-    if (str_path == NULL) {
-        return -ENOMEM;
-    }
-
-    value = strncpy_from_user(str, passwd, len);
-
-    if (value != 0) {
-        kfree(str);
-        return -EFAULT;
-    }
-
-    value = strncpy_from_user(str_path, path, len_path);
-    
-    if (value != 0) {
-        kfree(str_path);
-        return -EFAULT;
-    }
-
-    printk(KERN_INFO "Removing path ... \n");
-    spin_lock(&monitor.lock);
-    if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str, PASS_LEN) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR default passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    } else {
-        if(compare_hash(str, monitor.password) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR new passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    }
-
-    if(monitor.mode == 0 || monitor.mode == 1){
-        printk(KERN_INFO "Monitor OFF or ON - not in REC mode\n");
-        spin_unlock(&monitor.lock);
-        return -1;
-    }
-
-    for(int i = 0; i < monitor.last_index; i++){
-        if(strncmp_custom(monitor.path[i], str_path, PATH) == 0){
-            for(int j = i; j < monitor.last_index - 1; j++){
-                monitor.path[j] = monitor.path[j+1];
-            }
-            monitor.last_index--;
-            spin_unlock(&monitor.lock);
-            printk(KERN_INFO "Path removed\n");
-            return 0;
-        }
-    }
-
-    printk(KERN_INFO "Path not found\n");
-    spin_unlock(&monitor.lock);
-    return -1;
-}
-
-__SYSCALL_DEFINEx(2, _set_password, char __user *, passwd, char __user *, new_passwd){
-    printk(KERN_INFO "Setting password ... \n");
-
-    int ret;
-    size_t len_pas = strnlen_user(passwd);
-    size_t len_new_pas = strnlen_user(new_passwd);
-    char *str = kmalloc(len_pas + 1, GFP_KERNEL);
-    if (str == NULL) {
-        return -ENOMEM;
-    }
-    
-    ret = strncpy_from_user(str, passwd, len_pas);
-    if (ret != 0) {
-        kfree(str);
-        return -EFAULT;
-    }
-
-    spin_lock(&monitor.lock);
-
-    if(monitor.changed_pswd == 0) {
-        if(strncmp_custom(monitor.password, str, len_pas) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR default passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    } else {
-        if(compare_hash(str, monitor.password) != 0 || get_euid() != 0){
-            printk(KERN_INFO "ERROR new passwd\n");
-            spin_unlock(&monitor.lock);
-            return -1;
-        }
-    }
+static int ref_write()
 
 
-    unsigned char hash_passwd[SHA256_LENGTH];
-    char *new_pas = kmalloc(len_new_pas + 1, GFP_KERNEL);
-    if (new_pas == NULL) {
-        return -ENOMEM;
-    }
-    ret = strncpy_from_user(new_pas, new_passwd, len_new_pas);
-    if (ret != 0) {
-        kfree(new_pas);
-        return -EFAULT;
-    }
-    if(hash_password(new_pas, hash_passwd) != 0){
-        printk(KERN_INFO "Failed to hash password\n");
-        spin_unlock(&monitor.lock);
-        return -1;
-    }
-
-    // posso usare la strcnpy in questo modo???????
-
-    if(strncpy(monitor.password, new_pas, len_new_pas) == NULL){
-        printk(KERN_INFO "Failed to copy password\n");
-        spin_unlock(&monitor.lock);
-        return -1;
-    }
-
-
-    spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Password set\n");
-    return 0;
-} */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
-static unsigned long sys_monitor_OFF = (unsigned long) __x64_sys_monitor_OFF;	
-#else
-#endif
+static struct file_operations fops = {
+  .owner = THIS_MODULE,	
+  .write = ref_write,
+  .open = ref_open,
+};
 
 static int __init monitor_init(void) {
 
-    // Modifica della system call table - necessito di 7 entry 
-
     printk(KERN_INFO "Monitor module loaded\n");
 
-    //monitor.changed_pswd = 0;
-
-    if (syscall_table_address == 0x0) {
-        printk(KERN_INFO "syscall_table_address not set\n");
-        return -1;
+    Major = register_chrdev(0, DEVICE_NAME, &fops);
+    if (Major < 0) {
+        printk(KERN_ALERT "Registering char device failed with %d\n", Major);
+        return Major;
     }
 
-    /*if (entry1 == 0 || entry2 == 0 || entry3 == 0 || entry4 == 0 || entry5 == 0 || entry6 == 0 || entry7 == 0) {
-        printk(KERN_INFO "entry not set\n");
-        return -1;
-    }*/
+    printk(KERN_INFO "I was assigned major number %d. To talk to\n", Major);
 
-    printk(KERN_INFO "syscall_table_address: %lx\n", syscall_table_address);
-    /*printk(KERN_INFO "entry1: %d\n", entry1);
-    printk(KERN_INFO "entry2: %d\n", entry2);
-    printk(KERN_INFO "entry3: %d\n", entry3);
-    printk(KERN_INFO "entry4: %d\n", entry4);   
-    printk(KERN_INFO "entry5: %d\n", entry5);
-    printk(KERN_INFO "entry6: %d\n", entry6);
-    printk(KERN_INFO "entry7: %d\n", entry7);*/
-
-    int ret;
-
-    ret = get_entries(entries_syscall_table, TABLE_ENTRIES,(unsigned long *)syscall_table_address, &the_ny_syscall);
-
-    printk(KERN_INFO "ENTRIES %d\n", ret);
-
-    if (ret != TABLE_ENTRIES) {
-        printk(KERN_INFO "Failed to get entries from the sys-call table\n");
-        return -1;
-    }
-    
-    #ifdef SYS_CALL_INSTALL 
-
-    unprotect_memory();
-
-    ((unsigned long *)syscall_table_address)[entries_syscall_table[0]] = (unsigned long)sys_monitor_OFF;
-
-    protect_memory();
-    
-    #else
-    #endif
 
 
     kp_openat2.pre_handler = handler_openat2;
@@ -833,18 +450,9 @@ static int __init monitor_init(void) {
 
 static void __exit monitor_exit(void) {
 
-    #ifdef SYS_CALL_INSTALL 
+    printk(KERN_INFO "Monitor module unloaded\n");
 
-    unprotect_memory();
-
-    ((unsigned long *)syscall_table_address)[entries_syscall_table[0]] = the_ny_syscall;
-    //((unsigned long *)syscall_table_address)[156] = the_ny_syscall;
-    //((unsigned long *)syscall_table_address)[174] = the_ny_syscall;
-
-    protect_memory();
-    
-    #else
-    #endif
+    unregister_chrdev(Major, DEVICE_NAME);
 
     unregister_kprobe(&kp_openat2);
     unregister_kprobe(&kp_filp_open);
