@@ -10,6 +10,7 @@
         "spinlock.h": "c",
         "version.h": "c",
         "types.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "syscalls.h": "c"
     }
 }

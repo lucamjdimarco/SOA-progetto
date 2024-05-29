@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define DEVICE_NAME "/dev/ref_monitor"
+#define DEVICE_NAME "ref_monitor"
 
 int main(int argc, char *argv[]) {
 

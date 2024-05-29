@@ -25,7 +25,7 @@
 #define SHA256_LENGTH 32
 #define TABLE_ENTRIES 7
 
-#define DEVICE_NAME "/dev/ref_monitor"
+#define DEVICE_NAME "ref_monitor"
 
 static int Major;
 
@@ -55,6 +55,9 @@ struct open_flags {
 	int acc_mode;
 	int intent;
 };
+
+static ssize_t ref_write(struct file *, const char *, size_t, loff_t *);
+static int ref_open(struct inode *, struct file *);
 
 static inline bool is_root_uid(void) {
     #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
@@ -317,7 +320,7 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-int setMonitorON() {
+/*int setMonitorON() {
     printk(KERN_INFO "Monitor is now ON\n");
     spin_lock(&monitor.lock);
     monitor.mode = 1;
@@ -347,7 +350,7 @@ int setMonitorREC_OFF() {
     monitor.mode = 2;
     spin_unlock(&monitor.lock);
     return 0;
-}
+}*/
 
 
 static int ref_open(struct inode *inode, struct file *file) {
@@ -379,9 +382,10 @@ static ssize_t ref_write(struct file *f, const char *buff, size_t len, loff_t *o
 
     printk(KERN_INFO "Received: %s\n", buffer);
 
+    return len;
+
 }
 
-static int ref_write()
 
 
 static struct file_operations fops = {
@@ -399,6 +403,28 @@ static int __init monitor_init(void) {
         printk(KERN_ALERT "Registering char device failed with %d\n", Major);
         return Major;
     }
+
+    // DEV_T = MKDEV(Major, 0);
+
+    // /* class_create */
+    // device_class = class_create(THIS_MODULE, "gpio_device");
+    // if (IS_ERR(device_class))
+    // {
+    //     unregister_chrdev(my_major, "gpio_device");
+    //     printk(KERN_INFO "Class creation failed\n");
+    //     return PTR_ERR(device_class);
+    // }
+
+    // /* device_create */
+    // ptr_error = device_create(device_class, NULL, DEV_T, NULL, "gpio_device");
+    // if (IS_ERR(ptr_error))
+    // {
+    //     class_destroy(device_class);
+    //     unregister_chrdev(my_major, "gpio_device");
+    //     printk(KERN_INFO "Device creation failed\n");
+    //     return PTR_ERR(ptr_error);
+    // }
+
 
     printk(KERN_INFO "I was assigned major number %d. To talk to\n", Major);
 
