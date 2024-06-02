@@ -6,35 +6,34 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#define DEVICE_NAME "ref_monitor"
+#define DEVICE_NAME "/dev/ref_monitor"
 
 int main(int argc, char *argv[]) {
-
     int fd;
     ssize_t ret;
+    char buffer[2048];
 
-    if (argc != 2) {
-        printf("Usage: %s <string>\n", argv[0]);
+    if (argc != 3) {
+        printf("Usage: %s <command> <parameter>\n", argv[0]);
         return -1;
     }
+
+    snprintf(buffer, sizeof(buffer), "%s:%s", argv[1], argv[2]);
 
     fd = open(DEVICE_NAME, O_WRONLY);
     if(fd < 0) {
-        perror("Failed to open the device\n");
+        perror("Failed to open the device");
         return -1;
     }
 
-    ret = write(fd, argv[1], strlen(argv[1]));
-
+    ret = write(fd, buffer, strlen(buffer));
     if(ret < 0) {
-        perror("Failed to write the message to the device\n");
+        perror("Failed to write the message to the device");
+        close(fd);
         return -1;
     }
 
     close(fd);
 
-
-    
     return 0;
-
 }

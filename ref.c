@@ -16,6 +16,7 @@
 #include <linux/string.h>
 #include <linux/syscalls.h>
 #include <linux/version.h>
+#include <linux/device.h>
 #include "utils/hash.h"
 #include "utils/func_aux.h"
 
@@ -28,6 +29,8 @@
 #define DEVICE_NAME "ref_monitor"
 
 static int Major;
+static struct class* device_class = NULL;
+static struct device* device = NULL;
 
 struct r_monitor {
     char *path[MAX_LEN]; //array di puntatori ai path da proteggere
@@ -58,6 +61,12 @@ struct open_flags {
 
 static ssize_t ref_write(struct file *, const char *, size_t, loff_t *);
 static int ref_open(struct inode *, struct file *);
+// Dichiarazione delle funzioni di gestione
+int setMonitorON(void);
+int setMonitorOFF(void);
+int setMonitorREC_ON(void);
+int setMonitorREC_OFF(void);
+int changePassword(char *new_password);
 
 static inline bool is_root_uid(void) {
     #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
@@ -320,37 +329,56 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-/*int setMonitorON() {
-    printk(KERN_INFO "Monitor is now ON\n");
+int setMonitorON(void) {
     spin_lock(&monitor.lock);
     monitor.mode = 1;
     spin_unlock(&monitor.lock);
+    printk(KERN_INFO "Monitor is now ON\n");
     return 0;
 }
 
-int setMonitorOFF() {
-    printk(KERN_INFO "Monitor is now OFF\n");
+int setMonitorOFF(void) {
     spin_lock(&monitor.lock);
     monitor.mode = 0;
     spin_unlock(&monitor.lock);
+    printk(KERN_INFO "Monitor is now OFF\n");
     return 0;
 }
 
-int setMonitorREC_ON() {
-    printk(KERN_INFO "Monitor is now REC_ON\n");
+int setMonitorREC_ON(void) {
     spin_lock(&monitor.lock);
     monitor.mode = 3;
     spin_unlock(&monitor.lock);
+    printk(KERN_INFO "Monitor is now REC_ON\n");
     return 0;
 }
 
-int setMonitorREC_OFF() {
-    printk(KERN_INFO "Monitor is now REC_OFF\n");
+int setMonitorREC_OFF(void) {
     spin_lock(&monitor.lock);
     monitor.mode = 2;
     spin_unlock(&monitor.lock);
+    printk(KERN_INFO "Monitor is now REC_OFF\n");
     return 0;
-}*/
+}
+
+int changePassword(char *new_password) {
+    int ret;
+
+    char test[32];
+    ret = hash_password(new_password, test);
+    if(ret != 0) {
+        printk(KERN_ERR "Error hashing password\n");
+        //kfree(buffer);
+        return -1;
+    }
+
+    printk(KERN_INFO "Password hashed: %s\n", test);
+
+    printk(KERN_INFO "Password changed\n");
+
+
+    return 0;
+}
 
 
 static int ref_open(struct inode *inode, struct file *file) {
@@ -365,11 +393,13 @@ static ssize_t ref_write(struct file *f, const char *buff, size_t len, loff_t *o
 
     if (!buffer) {
 	    printk(KERN_ERR "Error on allocating memory\n");
+        kfree(buffer);
 	    return -ENOMEM;
 	}
 
     if(len > 1024) {
         printk(KERN_ERR "Error: too data\n");
+        kfree(buffer);
         return -EINVAL;
     }
 
@@ -377,10 +407,60 @@ static ssize_t ref_write(struct file *f, const char *buff, size_t len, loff_t *o
 
     if (ret) {
         printk(KERN_ERR "Error on copy_from_user\n");
+        kfree(buffer);
         return -EFAULT;
     }
 
-    printk(KERN_INFO "Received: %s\n", buffer);
+    buffer[len] = '\0'; // Assicurati che il buffer sia null-terminated
+
+    // Estrai i due argomenti
+    char *command = strsep(&buffer, ":");
+    char *parameter = buffer;
+
+    /*printk(KERN_INFO "Received: %s\n", buffer);
+
+    if(strncmp(buffer, "ON", 2) == 0) {
+        printk(KERN_INFO "Monitor is setting ON\n");
+        setMonitorON();
+    } else if(strncmp(buffer, "OFF", 3) == 0) {
+        setMonitorOFF();
+    } else if(strncmp(buffer, "REC_ON", 6) == 0) {
+        setMonitorREC_ON();
+    } else if(strncmp(buffer, "REC_OFF", 7) == 0) {
+        setMonitorREC_OFF();
+    } else {
+        printk(KERN_ERR "Error: invalid command\n");
+        kfree(buffer);
+        return -EINVAL;
+    }*/
+
+    if (command && parameter) {
+        printk(KERN_INFO "Received command: %s with parameter: %s\n", command, parameter);
+
+        if (strncmp(command, "ON", 2) == 0) {
+            printk(KERN_INFO "Monitor is setting ON\n");
+            setMonitorON();
+        } else if (strncmp(command, "OFF", 3) == 0) {
+            setMonitorOFF();
+        } else if (strncmp(command, "REC_ON", 6) == 0) {
+            setMonitorREC_ON();
+        } else if (strncmp(command, "REC_OFF", 7) == 0) {
+            setMonitorREC_OFF();
+        } else if (strncmp(command, "CHGPASS", 7) == 0) {
+            changePassword(parameter);
+        } else {
+            printk(KERN_ERR "Error: invalid command\n");
+            kfree(buffer);
+            return -EINVAL;
+        }
+    } else {
+        printk(KERN_ERR "Error: invalid input format\n");
+        kfree(buffer);
+        return -EINVAL;
+    }
+    
+    kfree(buffer);
+
 
     return len;
 
@@ -404,26 +484,22 @@ static int __init monitor_init(void) {
         return Major;
     }
 
-    // DEV_T = MKDEV(Major, 0);
+    // Creazione della classe del dispositivo
+    device_class = class_create(DEVICE_NAME);
+    if (IS_ERR(device_class)) {
+        unregister_chrdev(Major, DEVICE_NAME);
+        printk(KERN_INFO "Class creation failed\n");
+        return PTR_ERR(device_class);
+    }
 
-    // /* class_create */
-    // device_class = class_create(THIS_MODULE, "gpio_device");
-    // if (IS_ERR(device_class))
-    // {
-    //     unregister_chrdev(my_major, "gpio_device");
-    //     printk(KERN_INFO "Class creation failed\n");
-    //     return PTR_ERR(device_class);
-    // }
-
-    // /* device_create */
-    // ptr_error = device_create(device_class, NULL, DEV_T, NULL, "gpio_device");
-    // if (IS_ERR(ptr_error))
-    // {
-    //     class_destroy(device_class);
-    //     unregister_chrdev(my_major, "gpio_device");
-    //     printk(KERN_INFO "Device creation failed\n");
-    //     return PTR_ERR(ptr_error);
-    // }
+    // Creazione del dispositivo
+    device = device_create(device_class, NULL, MKDEV(Major, 0), NULL, DEVICE_NAME);
+    if (IS_ERR(device)) {
+        class_destroy(device_class);
+        unregister_chrdev(Major, DEVICE_NAME);
+        printk(KERN_INFO "Device creation failed\n");
+        return PTR_ERR(device);
+    }
 
 
     printk(KERN_INFO "I was assigned major number %d. To talk to\n", Major);
@@ -478,7 +554,13 @@ static void __exit monitor_exit(void) {
 
     printk(KERN_INFO "Monitor module unloaded\n");
 
+    // Rimozione del dispositivo
+    device_destroy(device_class, MKDEV(Major, 0));
+    class_unregister(device_class);
+    class_destroy(device_class);
     unregister_chrdev(Major, DEVICE_NAME);
+
+    //unregister_chrdev(Major, DEVICE_NAME);
 
     unregister_kprobe(&kp_openat2);
     unregister_kprobe(&kp_filp_open);
