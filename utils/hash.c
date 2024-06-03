@@ -16,6 +16,11 @@ int hash_password(const char *plaintext, unsigned char *output) {
     struct shash_desc *shash;
     int size, ret;
 
+     if (!plaintext || !output) {
+        printk(KERN_ERR "Invalid input to hash_password\n");
+        return -EINVAL;
+    }
+
     sha256 = crypto_alloc_shash("sha256", 0, 0);
     if (IS_ERR(sha256)) {
         return PTR_ERR(sha256);
@@ -24,6 +29,7 @@ int hash_password(const char *plaintext, unsigned char *output) {
     size = sizeof(struct shash_desc) + crypto_shash_descsize(sha256);
     shash = kmalloc(size, GFP_KERNEL);
     if (!shash) {
+        printk(KERN_ERR "Failed to allocate shash descriptor\n");
         crypto_free_shash(sha256);
         return -ENOMEM;
     }
@@ -32,6 +38,10 @@ int hash_password(const char *plaintext, unsigned char *output) {
     //shash->flags = 0x0;
 
     ret = crypto_shash_digest(shash, plaintext, strlen(plaintext), output);
+    if (ret) {
+        printk(KERN_ERR "crypto_shash_digest failed: %d\n", ret);
+    }
+    
     kfree(shash);
     crypto_free_shash(sha256);
 

@@ -22,7 +22,7 @@
 
 #define PATH 512
 #define MAX_LEN 50
-#define PASS_LEN 20
+#define PASS_LEN 32
 #define SHA256_LENGTH 32
 #define TABLE_ENTRIES 7
 
@@ -62,11 +62,12 @@ struct open_flags {
 static ssize_t ref_write(struct file *, const char *, size_t, loff_t *);
 static int ref_open(struct inode *, struct file *);
 // Dichiarazione delle funzioni di gestione
-int setMonitorON(void);
-int setMonitorOFF(void);
-int setMonitorREC_ON(void);
-int setMonitorREC_OFF(void);
+int setMonitorON(char *pass);
+int setMonitorOFF(char *pass);
+int setMonitorREC_ON(char *pass);
+int setMonitorREC_OFF(char *pass);
 int changePassword(char *new_password);
+int comparePassw(char *pass);
 
 static inline bool is_root_uid(void) {
     #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
@@ -329,7 +330,86 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-int setMonitorON(void) {
+int comparePassw(char *pass) {
+    int ret;
+    char hash[PASS_LEN + 1];
+    ret = hash_password(pass, hash);
+    if(ret != 0) {
+        printk(KERN_ERR "Error hashing password\n");
+        return -1;
+    }
+
+    if(memcmp(hash, monitor.password, SHA256_LENGTH) == 0) {
+        printk(KERN_INFO "Password correct\n");
+        return 0;
+    } else {
+        printk(KERN_INFO "Password incorrect\n");
+        return -1;
+    }
+
+}
+
+int setMonitorON(char *pass) {
+    int ret;
+    char hash[PASS_LEN + 1];
+
+    if(is_root_uid() != 0) {
+        printk(KERN_ERR "Error: ROOT user required\n");
+        return -1;
+    }
+
+    ret = hash_password(pass, hash);
+    if(ret != 0) {
+        printk(KERN_ERR "Error hashing password\n");
+        return -1;
+    }
+
+    if(comparePassw(hash) != 0) {
+        printk(KERN_ERR "Error: password incorrect\n");
+        return -1;
+    }
+
+    switch(monitor.mode){
+        case 0:
+            spin_lock(&monitor.lock);
+            monitor.mode = 1;
+            spin_unlock(&monitor.lock);
+
+            enable_kprobe(&kp_openat2);
+            enable_kprobe(&kp_filp_open);
+            enable_kprobe(&kp_rmdir);
+            enable_kprobe(&kp_mkdir_at);
+            enable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now ON\n");
+            break;
+        case 1:
+            printk(KERN_INFO "Monitor is already ON\n");
+            break;
+        case 2:
+            spin_lock(&monitor.lock);
+            monitor.mode = 1;
+            spin_unlock(&monitor.lock);
+
+            enable_kprobe(&kp_openat2);
+            enable_kprobe(&kp_filp_open);
+            enable_kprobe(&kp_rmdir);
+            enable_kprobe(&kp_mkdir_at);
+            enable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now ON\n");
+            break;
+        case 3:
+            spin_lock(&monitor.lock);
+            monitor.mode = 1;
+            spin_unlock(&monitor.lock);
+
+            printk(KERN_INFO "Monitor is now ON\n");
+            break;
+        default:
+            printk(KERN_ERR "Error: invalid mode\n");
+            return -1;
+    }
     spin_lock(&monitor.lock);
     monitor.mode = 1;
     spin_unlock(&monitor.lock);
@@ -337,48 +417,220 @@ int setMonitorON(void) {
     return 0;
 }
 
-int setMonitorOFF(void) {
-    spin_lock(&monitor.lock);
-    monitor.mode = 0;
-    spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Monitor is now OFF\n");
+int setMonitorOFF(char *pass) {
+    int ret;
+    char hash[PASS_LEN + 1];
+
+    if(is_root_uid() != 0) {
+        printk(KERN_ERR "Error: ROOT user required\n");
+        return -1;
+    }
+    
+    ret = hash_password(pass, hash);
+    if(ret != 0) {
+        printk(KERN_ERR "Error hashing password\n");
+        return -1;
+    }
+
+    if(comparePassw(hash) != 0) {
+        printk(KERN_ERR "Error: password incorrect\n");
+        return -1;
+    }
+
+    switch(monitor.mode){
+        case 0:
+            printk(KERN_INFO "Monitor is already OFF\n");
+            break;
+        case 1:
+            spin_lock(&monitor.lock);
+            monitor.mode = 0;
+            spin_unlock(&monitor.lock);
+
+            disable_kprobe(&kp_openat2);
+            disable_kprobe(&kp_filp_open);
+            disable_kprobe(&kp_rmdir);
+            disable_kprobe(&kp_mkdir_at);
+            disable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now OFF\n");
+            break;
+        case 2:
+            spin_lock(&monitor.lock);
+            monitor.mode = 0;
+            spin_unlock(&monitor.lock);
+
+            printk(KERN_INFO "Monitor is now OFF\n");
+            break;
+        case 3:
+            spin_lock(&monitor.lock);
+            monitor.mode = 0;
+            spin_unlock(&monitor.lock);
+
+            disable_kprobe(&kp_openat2);
+            disable_kprobe(&kp_filp_open);
+            disable_kprobe(&kp_rmdir);
+            disable_kprobe(&kp_mkdir_at);
+            disable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now OFF\n");
+            break;
+        default:
+            printk(KERN_ERR "Error: invalid mode\n");
+            return -1;
+    }
     return 0;
 }
 
-int setMonitorREC_ON(void) {
-    spin_lock(&monitor.lock);
-    monitor.mode = 3;
-    spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Monitor is now REC_ON\n");
+int setMonitorREC_ON(char *pass) {
+    int ret;
+    char hash[PASS_LEN + 1];
+
+    if(is_root_uid() != 0) {
+        printk(KERN_ERR "Error: ROOT user required\n");
+        return -1;
+    }
+
+    ret = hash_password(pass, hash);
+    if(ret != 0) {
+        printk(KERN_ERR "Error hashing password\n");
+        return -1;
+    }
+
+    if(comparePassw(hash) != 0) {
+        printk(KERN_ERR "Error: password incorrect\n");
+        return -1;
+    }
+
+    switch(monitor.mode){
+        case 0:
+            spin_lock(&monitor.lock);
+            monitor.mode = 3;
+            spin_unlock(&monitor.lock);
+            
+            enable_kprobe(&kp_openat2);
+            enable_kprobe(&kp_filp_open);
+            enable_kprobe(&kp_rmdir);
+            enable_kprobe(&kp_mkdir_at);
+            enable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now REC_ON\n");
+            break;
+        case 1:
+            spin_lock(&monitor.lock);
+            monitor.mode = 3;
+            spin_unlock(&monitor.lock);
+            printk(KERN_INFO "Monitor is now REC_ON\n");
+            break;
+        case 2:
+            spin_lock(&monitor.lock);
+            monitor.mode = 3;
+            spin_unlock(&monitor.lock);
+
+            enable_kprobe(&kp_openat2);
+            enable_kprobe(&kp_filp_open);
+            enable_kprobe(&kp_rmdir);
+            enable_kprobe(&kp_mkdir_at);
+            enable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now REC_ON\n");
+            break;
+        case 3:
+            printk(KERN_INFO "Monitor is already REC_ON\n");
+            break;
+        default:
+            printk(KERN_ERR "Error: invalid mode\n");
+            return -1;
+    }
     return 0;
 }
 
-int setMonitorREC_OFF(void) {
-    spin_lock(&monitor.lock);
-    monitor.mode = 2;
-    spin_unlock(&monitor.lock);
-    printk(KERN_INFO "Monitor is now REC_OFF\n");
+int setMonitorREC_OFF(char *pass) {
+    int ret;
+    char hash[PASS_LEN + 1];
+
+    if(is_root_uid() != 0) {
+        printk(KERN_ERR "Error: ROOT user required\n");
+        return -1;
+    }
+
+    ret = hash_password(pass, hash);
+    if(ret != 0) {
+        printk(KERN_ERR "Error hashing password\n");
+        return -1;
+    }
+
+    if(comparePassw(hash) != 0) {
+        printk(KERN_ERR "Error: password incorrect\n");
+        return -1;
+    }
+
+    switch(monitor.mode){
+        case 0:
+            printk(KERN_INFO "Monitor is already REC_OFF\n");
+            break;
+        case 1:
+            spin_lock(&monitor.lock);
+            monitor.mode = 2;
+            spin_unlock(&monitor.lock);
+
+            disable_kprobe(&kp_openat2);
+            disable_kprobe(&kp_filp_open);
+            disable_kprobe(&kp_rmdir);
+            disable_kprobe(&kp_mkdir_at);
+            disable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now REC_OFF\n");
+            break;
+        case 2:
+            printk(KERN_INFO "Monitor is already REC_OFF\n");
+            break;
+        case 3:
+            spin_lock(&monitor.lock);
+            monitor.mode = 2;
+            spin_unlock(&monitor.lock);
+
+            disable_kprobe(&kp_openat2);
+            disable_kprobe(&kp_filp_open);
+            disable_kprobe(&kp_rmdir);
+            disable_kprobe(&kp_mkdir_at);
+            disable_kprobe(&kp_unlinkat);
+
+            printk(KERN_INFO "Monitor is now REC_OFF\n");
+            break;
+        default:
+            printk(KERN_ERR "Error: invalid mode\n");
+            return -1;
+    }
     return 0;
 }
 
 int changePassword(char *new_password) {
     int ret;
+    char hash[PASS_LEN + 1];
 
-    char test[32];
-    ret = hash_password(new_password, test);
-    if(ret != 0) {
-        printk(KERN_ERR "Error hashing password\n");
-        //kfree(buffer);
+    if((monitor.mode != 2 && monitor.mode != 3) && is_root_uid() != 0){
+        printk(KERN_ERR "Error: Monitor is not in REC mode or not ROOT user - try again\n");
         return -1;
     }
 
-    printk(KERN_INFO "Password hashed: %s\n", test);
+
+    ret = hash_password(new_password, hash);
+    if(ret != 0) {
+        printk(KERN_ERR "Error hashing password\n");
+        return -1;
+    }
 
     printk(KERN_INFO "Password changed\n");
+
+    spin_lock(&monitor.lock);
+    strncpy(monitor.password, hash, PASS_LEN);
+    monitor.changed_pswd = 1;
+    spin_unlock(&monitor.lock);
 
 
     return 0;
 }
+
 
 
 static int ref_open(struct inode *inode, struct file *file) {
@@ -417,37 +669,22 @@ static ssize_t ref_write(struct file *f, const char *buff, size_t len, loff_t *o
     char *command = strsep(&buffer, ":");
     char *parameter = buffer;
 
-    /*printk(KERN_INFO "Received: %s\n", buffer);
-
-    if(strncmp(buffer, "ON", 2) == 0) {
-        printk(KERN_INFO "Monitor is setting ON\n");
-        setMonitorON();
-    } else if(strncmp(buffer, "OFF", 3) == 0) {
-        setMonitorOFF();
-    } else if(strncmp(buffer, "REC_ON", 6) == 0) {
-        setMonitorREC_ON();
-    } else if(strncmp(buffer, "REC_OFF", 7) == 0) {
-        setMonitorREC_OFF();
-    } else {
-        printk(KERN_ERR "Error: invalid command\n");
-        kfree(buffer);
-        return -EINVAL;
-    }*/
-
     if (command && parameter) {
         printk(KERN_INFO "Received command: %s with parameter: %s\n", command, parameter);
 
         if (strncmp(command, "ON", 2) == 0) {
             printk(KERN_INFO "Monitor is setting ON\n");
-            setMonitorON();
+            setMonitorON(parameter);
         } else if (strncmp(command, "OFF", 3) == 0) {
-            setMonitorOFF();
+            setMonitorOFF(parameter);
         } else if (strncmp(command, "REC_ON", 6) == 0) {
-            setMonitorREC_ON();
+            setMonitorREC_ON(parameter);
         } else if (strncmp(command, "REC_OFF", 7) == 0) {
-            setMonitorREC_OFF();
+            setMonitorREC_OFF(parameter);
         } else if (strncmp(command, "CHGPASS", 7) == 0) {
             changePassword(parameter);
+        } else if (strncmp(command, "CMP", 3) == 0){
+            comparePassw(parameter);        
         } else {
             printk(KERN_ERR "Error: invalid command\n");
             kfree(buffer);
