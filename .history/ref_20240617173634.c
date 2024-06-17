@@ -501,6 +501,8 @@ int setMonitorREC_ON(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
 
+    pass[PASS_LEN] = '\0';
+
     if(is_root_uid() != 1) {
         printk(KERN_ERR "Error: ROOT user required\n");
         return -1;
@@ -510,20 +512,6 @@ int setMonitorREC_ON(char *pass) {
     if(ret != 0) {
         printk(KERN_ERR "Error hashing password\n");
         return -1;
-    }
-
-    int pos1 = findNullTerminator(pass, sizeof(pass));
-    if (pos1 != -1) {
-        printf("La stringa1 ha il terminatore nullo alla posizione %d.\n", pos1);
-    } else {
-        printf("La stringa1 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    int pos2 = findNullTerminator(hash, sizeof(hash));
-    if (pos2 != -1) {
-        printf("La stringa2 ha il terminatore nullo alla posizione %d.\n", pos2);
-    } else {
-        printf("La stringa2 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
     }
 
     printk(KERN_INFO "Passwd: %s\n", monitor.password);

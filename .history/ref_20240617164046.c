@@ -333,19 +333,6 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-int findNullTerminator(const char *str, size_t maxlen) {
-    size_t i = 0;
-    while (i < maxlen && str[i] != '\0') {
-        i++;
-    }
-
-    if (i < maxlen && str[i] == '\0') {
-        return i;  // Restituisce la posizione del terminatore nullo
-    } else {
-        return -1; // Se non trova il terminatore nullo entro maxlen
-    }
-}
-
 int comparePassw(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
@@ -512,24 +499,6 @@ int setMonitorREC_ON(char *pass) {
         return -1;
     }
 
-    int pos1 = findNullTerminator(pass, sizeof(pass));
-    if (pos1 != -1) {
-        printf("La stringa1 ha il terminatore nullo alla posizione %d.\n", pos1);
-    } else {
-        printf("La stringa1 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    int pos2 = findNullTerminator(hash, sizeof(hash));
-    if (pos2 != -1) {
-        printf("La stringa2 ha il terminatore nullo alla posizione %d.\n", pos2);
-    } else {
-        printf("La stringa2 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    printk(KERN_INFO "Passwd: %s\n", monitor.password);
-
-    printk(KERN_INFO "Passwd: %s\n", hash);
-
     if(comparePassw(hash) != 0) {
         printk(KERN_ERR "Error: password incorrect\n");
         return -1;
@@ -650,13 +619,13 @@ int changePassword(char *new_password) {
     printk(KERN_INFO "Changing password - setting the monitor REC_ON or REC_OFF\n");
     
     if(monitor.mode == 0) {
-        spin_lock(&monitor.lock);  
+        monitor.spin_lock(&monitor.lock);  
         monitor.mode = 2;
-        spin_unlock(&monitor.lock);
+        monitor.spin_unlock(&monitor.lock);
     } else if(monitor.mode == 1) {
-        spin_lock(&monitor.lock);  
+        monitor.spin_lock(&monitor.lock);  
         monitor.mode = 3;
-        spin_unlock(&monitor.lock);
+        monitor.spin_unlock(&monitor.lock);
     }
 
     /*if((monitor.mode != 2 || monitor.mode != 3) || is_root_uid() != 1){
@@ -680,13 +649,13 @@ int changePassword(char *new_password) {
 
     printk(KERN_INFO "Password changed - reset the monitor\n");
     if(monitor.mode == 2) {
-        spin_lock(&monitor.lock);  
+        monitor.spin_lock(&monitor.lock);  
         monitor.mode = 0;
-        spin_unlock(&monitor.lock);
+        monitor.spin_unlock(&monitor.lock);
     } else if(monitor.mode == 3) {
-        spin_lock(&monitor.lock);  
+        monitor.spin_lock(&monitor.lock);  
         monitor.mode = 1;
-        spin_unlock(&monitor.lock);
+        monitor.spin_unlock(&monitor.lock);
     }
 
 

@@ -333,19 +333,6 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-int findNullTerminator(const char *str, size_t maxlen) {
-    size_t i = 0;
-    while (i < maxlen && str[i] != '\0') {
-        i++;
-    }
-
-    if (i < maxlen && str[i] == '\0') {
-        return i;  // Restituisce la posizione del terminatore nullo
-    } else {
-        return -1; // Se non trova il terminatore nullo entro maxlen
-    }
-}
-
 int comparePassw(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
@@ -501,6 +488,8 @@ int setMonitorREC_ON(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
 
+    pass[PASS_LEN] = '\0';
+
     if(is_root_uid() != 1) {
         printk(KERN_ERR "Error: ROOT user required\n");
         return -1;
@@ -512,23 +501,9 @@ int setMonitorREC_ON(char *pass) {
         return -1;
     }
 
-    int pos1 = findNullTerminator(pass, sizeof(pass));
-    if (pos1 != -1) {
-        printf("La stringa1 ha il terminatore nullo alla posizione %d.\n", pos1);
-    } else {
-        printf("La stringa1 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
+    printk(KERN_INFO "Passwd: %x\n", monitor.password);
 
-    int pos2 = findNullTerminator(hash, sizeof(hash));
-    if (pos2 != -1) {
-        printf("La stringa2 ha il terminatore nullo alla posizione %d.\n", pos2);
-    } else {
-        printf("La stringa2 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    printk(KERN_INFO "Passwd: %s\n", monitor.password);
-
-    printk(KERN_INFO "Passwd: %s\n", hash);
+    printk(KERN_INFO "Passwd: %x\n", hash);
 
     if(comparePassw(hash) != 0) {
         printk(KERN_ERR "Error: password incorrect\n");

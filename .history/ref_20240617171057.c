@@ -333,19 +333,6 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-int findNullTerminator(const char *str, size_t maxlen) {
-    size_t i = 0;
-    while (i < maxlen && str[i] != '\0') {
-        i++;
-    }
-
-    if (i < maxlen && str[i] == '\0') {
-        return i;  // Restituisce la posizione del terminatore nullo
-    } else {
-        return -1; // Se non trova il terminatore nullo entro maxlen
-    }
-}
-
 int comparePassw(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
@@ -512,23 +499,9 @@ int setMonitorREC_ON(char *pass) {
         return -1;
     }
 
-    int pos1 = findNullTerminator(pass, sizeof(pass));
-    if (pos1 != -1) {
-        printf("La stringa1 ha il terminatore nullo alla posizione %d.\n", pos1);
-    } else {
-        printf("La stringa1 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    int pos2 = findNullTerminator(hash, sizeof(hash));
-    if (pos2 != -1) {
-        printf("La stringa2 ha il terminatore nullo alla posizione %d.\n", pos2);
-    } else {
-        printf("La stringa2 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
     printk(KERN_INFO "Passwd: %s\n", monitor.password);
 
-    printk(KERN_INFO "Passwd: %s\n", hash);
+    printk(KERN_INFO "Passwd passed: %s\n", hash);
 
     if(comparePassw(hash) != 0) {
         printk(KERN_ERR "Error: password incorrect\n");
@@ -725,7 +698,7 @@ static ssize_t ref_write(struct file *f, const char *buff, size_t len, loff_t *o
         return -EFAULT;
     }
 
-    buffer[len] = '\0'; // Assicurati che il buffer sia null-terminated
+    //buffer[len] = '\0'; // Assicurati che il buffer sia null-terminated
 
     // Estrai i due argomenti
     char *command = strsep(&buffer, ":");

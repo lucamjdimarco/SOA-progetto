@@ -512,20 +512,6 @@ int setMonitorREC_ON(char *pass) {
         return -1;
     }
 
-    int pos1 = findNullTerminator(pass, sizeof(pass));
-    if (pos1 != -1) {
-        printf("La stringa1 ha il terminatore nullo alla posizione %d.\n", pos1);
-    } else {
-        printf("La stringa1 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    int pos2 = findNullTerminator(hash, sizeof(hash));
-    if (pos2 != -1) {
-        printf("La stringa2 ha il terminatore nullo alla posizione %d.\n", pos2);
-    } else {
-        printf("La stringa2 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
     printk(KERN_INFO "Passwd: %s\n", monitor.password);
 
     printk(KERN_INFO "Passwd: %s\n", hash);

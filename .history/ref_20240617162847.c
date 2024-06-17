@@ -74,7 +74,6 @@ static inline bool is_root_uid(void) {
         #include "linux/uidgid.h"
             // current_uid() returns struct in newer kernels
             printk(KERN_INFO "Check if root\n");
-            printk(KERN_INFO "UID: %d\n", uid_eq(current_uid(), GLOBAL_ROOT_UID));
             return uid_eq(current_uid(), GLOBAL_ROOT_UID);
         #else
             printk(KERN_INFO "Check else root\n");
@@ -333,19 +332,6 @@ static int handler_unlinkat(struct kprobe *p, struct pt_regs *regs) {
     return 0;
 }
 
-int findNullTerminator(const char *str, size_t maxlen) {
-    size_t i = 0;
-    while (i < maxlen && str[i] != '\0') {
-        i++;
-    }
-
-    if (i < maxlen && str[i] == '\0') {
-        return i;  // Restituisce la posizione del terminatore nullo
-    } else {
-        return -1; // Se non trova il terminatore nullo entro maxlen
-    }
-}
-
 int comparePassw(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
@@ -369,7 +355,7 @@ int setMonitorON(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
 
-    if(is_root_uid() != 1) {
+    if(is_root_uid() != 0) {
         printk(KERN_ERR "Error: ROOT user required\n");
         return -1;
     }
@@ -437,7 +423,7 @@ int setMonitorOFF(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
 
-    if(is_root_uid() != 1) {
+    if(is_root_uid() != 0) {
         printk(KERN_ERR "Error: ROOT user required\n");
         return -1;
     }
@@ -501,7 +487,7 @@ int setMonitorREC_ON(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
 
-    if(is_root_uid() != 1) {
+    if(is_root_uid() != 0) {
         printk(KERN_ERR "Error: ROOT user required\n");
         return -1;
     }
@@ -511,24 +497,6 @@ int setMonitorREC_ON(char *pass) {
         printk(KERN_ERR "Error hashing password\n");
         return -1;
     }
-
-    int pos1 = findNullTerminator(pass, sizeof(pass));
-    if (pos1 != -1) {
-        printf("La stringa1 ha il terminatore nullo alla posizione %d.\n", pos1);
-    } else {
-        printf("La stringa1 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    int pos2 = findNullTerminator(hash, sizeof(hash));
-    if (pos2 != -1) {
-        printf("La stringa2 ha il terminatore nullo alla posizione %d.\n", pos2);
-    } else {
-        printf("La stringa2 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    printk(KERN_INFO "Passwd: %s\n", monitor.password);
-
-    printk(KERN_INFO "Passwd: %s\n", hash);
 
     if(comparePassw(hash) != 0) {
         printk(KERN_ERR "Error: password incorrect\n");
@@ -582,7 +550,7 @@ int setMonitorREC_OFF(char *pass) {
     int ret;
     char hash[PASS_LEN + 1];
 
-    if(is_root_uid() != 1) {
+    if(is_root_uid() != 0) {
         printk(KERN_ERR "Error: ROOT user required\n");
         return -1;
     }
@@ -642,27 +610,10 @@ int changePassword(char *new_password) {
     int ret;
     char hash[PASS_LEN + 1];
 
-    if(is_root_uid() != 1) {
-        printk(KERN_ERR "Error: ROOT user required\n");
-        return -1;
-    }
-
-    printk(KERN_INFO "Changing password - setting the monitor REC_ON or REC_OFF\n");
-    
-    if(monitor.mode == 0) {
-        spin_lock(&monitor.lock);  
-        monitor.mode = 2;
-        spin_unlock(&monitor.lock);
-    } else if(monitor.mode == 1) {
-        spin_lock(&monitor.lock);  
-        monitor.mode = 3;
-        spin_unlock(&monitor.lock);
-    }
-
-    /*if((monitor.mode != 2 || monitor.mode != 3) || is_root_uid() != 1){
+    if((monitor.mode != 2 && monitor.mode != 3) && is_root_uid() != 0){
         printk(KERN_ERR "Error: Monitor is not in REC mode or not ROOT user - try again\n");
         return -1;
-    }*/
+    }
 
 
     ret = hash_password(new_password, hash);
@@ -677,17 +628,6 @@ int changePassword(char *new_password) {
     strncpy(monitor.password, hash, PASS_LEN);
     monitor.changed_pswd = 1;
     spin_unlock(&monitor.lock);
-
-    printk(KERN_INFO "Password changed - reset the monitor\n");
-    if(monitor.mode == 2) {
-        spin_lock(&monitor.lock);  
-        monitor.mode = 0;
-        spin_unlock(&monitor.lock);
-    } else if(monitor.mode == 3) {
-        spin_lock(&monitor.lock);  
-        monitor.mode = 1;
-        spin_unlock(&monitor.lock);
-    }
 
 
     return 0;
