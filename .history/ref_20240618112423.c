@@ -530,7 +530,7 @@ int setMonitorREC_ON(char *pass) {
 
     printk(KERN_INFO "Passwd: %s\n", hash);*/
 
-    if(comparePassw(pass) != 0) {
+    if(comparePassw(hash) != 0) {
         printk(KERN_ERR "Error: password incorrect\n");
         return -1;
     }
