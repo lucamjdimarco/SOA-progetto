@@ -506,31 +506,7 @@ int setMonitorREC_ON(char *pass) {
         return -1;
     }
 
-    /*ret = hash_password(pass, hash);
-    if(ret != 0) {
-        printk(KERN_ERR "Error hashing password\n");
-        return -1;
-    }
-
-    int pos1 = findNullTerminator(pass, sizeof(pass));
-    if (pos1 != -1) {
-        printk(KERN_INFO "La stringa1 ha il terminatore nullo alla posizione %d.\n", pos1);
-    } else {
-        printk(KERN_INFO "La stringa1 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(pass));
-    }
-
-    int pos2 = findNullTerminator(hash, sizeof(hash));
-    if (pos2 != -1) {
-        printk(KERN_INFO "La stringa2 ha il terminatore nullo alla posizione %d.\n", pos2);
-    } else {
-        printk(KERN_INFO "La stringa2 non ha il terminatore nullo entro %zu caratteri.\n", sizeof(hash));
-    }
-
-    printk(KERN_INFO "Passwd: %s\n", monitor.password);
-
-    printk(KERN_INFO "Passwd: %s\n", hash);*/
-
-    if(comparePassw(pass) != 0) {
+    if(compare_hash(pass, monitor.password) != 0) {
         printk(KERN_ERR "Error: password incorrect\n");
         return -1;
     }

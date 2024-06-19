@@ -48,25 +48,12 @@ int hash_password(const char *plaintext, unsigned char *output) {
     return ret;
 }
 
-int compare_hash(char __user *password, unsigned char *hash_passwd) {
+int compare_hash(char *password, unsigned char *hash_passwd) {
     //char *password = "password123";
-    int value;
+    //int value;
     unsigned char hash[SHA256_LENGTH];
-    size_t len = strlen(password);
-    char *str = kmalloc(len + 1, GFP_KERNEL);
 
-    if (str == NULL) {
-        return -ENOMEM;
-    }
-
-    value = copy_from_user(str, password, len);
-
-    if (value != 0) {
-        kfree(str);
-        return -EFAULT;
-    }
-
-    if (hash_password(str, hash) == 0) {
+    if (hash_password(password, hash) == 0) {
         // Hash calcolato con successo
         printk(KERN_INFO "Password hashed\n");
         //prima usavo strncmp
@@ -76,14 +63,12 @@ int compare_hash(char __user *password, unsigned char *hash_passwd) {
         } else {
             // Password errata
             printk(KERN_INFO "Password incorrect\n");
-            kfree(str);
             return -1;
         }
 
     } else {
         // Errore nel calcolo dell'hash
         printk(KERN_ERR "Error hashing password\n");
-        kfree(str);
         return -1;
     }
 
